@@ -3,7 +3,7 @@ import apiClient from '../api';
 import { useState } from 'react';
 
 function SatkerSelect({ user }) {
-  const [selectedValue] = useState(user);
+  const [selectedValue, setSelectedValue] = useState(user.id);
   const { data, isLoading, error } = useQuery({
     queryKey: ['satkers'],
     queryFn: async () => {
@@ -16,7 +16,13 @@ function SatkerSelect({ user }) {
   if (error) return <p>Error: {error.message}</p>;
 
   return (
-    <select value={selectedValue} disabled={user.satkerId ? true : false}>
+    <select
+      value={selectedValue}
+      disabled={user.satkerId ? true : false}
+      onChange={(e) => {
+        setSelectedValue(e.target.value);
+      }}
+    >
       {data.map((satker) => (
         <option key={satker.id} value={satker.id}>
           {satker.nama}
