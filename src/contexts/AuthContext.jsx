@@ -1,54 +1,67 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useState, useEffect, useContext } from 'react';
-import { jwtDecode } from 'jwt-decode'; // Install: npm install jwt-decode
+// Hapus 'useNavigate' karena tidak akan digunakan di sini lagi
+import { jwtDecode } from 'jwt-decode';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  // Hapus 'useNavigate'
+
+  const loadUserFromToken = (token) => {
+    try {
+      const decodedUser = jwtDecode(token);
+      if (decodedUser.exp * 1000 < Date.now()) {
+        localStorage.removeItem('token');
+        setUser(null);
+      } else {
+        setUser(decodedUser);
+      }
+    } catch {
+      localStorage.removeItem('token');
+      setUser(null);
+    }
+  };
 
   useEffect(() => {
-    // Cek localStorage saat aplikasi pertama kali dimuat
     const token = localStorage.getItem('token');
     if (token) {
-      try {
-        const decodedUser = jwtDecode(token);
-        // Cek jika token sudah kedaluwarsa
-        if (decodedUser.exp * 1000 < Date.now()) {
-          localStorage.removeItem('token');
-        } else {
-          setUser(decodedUser);
-        }
-      } catch (error) {
-        // Jika token tidak valid, hapus
-        localStorage.removeItem('token');
-        console.error('Invalid token found in localStorage', error);
-      }
+      loadUserFromToken(token);
     }
+    setLoading(false);
+
+    const handleStorageChange = () => {
+      const updatedToken = localStorage.getItem('token');
+      if (updatedToken) {
+        loadUserFromToken(updatedToken);
+      } else {
+        setUser(null);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  const logout = () => {
-    // Hapus token dari localStorage
-    localStorage.removeItem('token');
-    // Set state user menjadi null
-    setUser(null);
-    // Arahkan ke halaman login
-    window.location.href = '/login';
-  };
-
+  // Modifikasi fungsi 'login' untuk tidak lagi menangani navigasi
   const login = (token) => {
     localStorage.setItem('token', token);
-    const decodedUser = jwtDecode(token);
-    setUser(decodedUser);
+    loadUserFromToken(token);
+    // Navigasi akan ditangani oleh komponen yang memanggil fungsi ini
   };
 
-  return (
-    <AuthContext.Provider value={{ user, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
+  // Modifikasi fungsi 'logout' untuk tidak lagi menangani navigasi
+  const logout = () => {
+    localStorage.removeItem('token');
+    setUser(null);
+    // Navigasi akan ditangani oleh komponen yang memanggil fungsi ini
+  };
 
-// Custom hook agar lebih mudah digunakan
-export const useAuth = () => {
-  return useContext(AuthContext);
+  const value = { user, login, logout, loading };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+// Custom hook agar lebih mudah digunakan
+export const useAuth = () => useContext(AuthContext);
