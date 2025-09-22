@@ -14,10 +14,10 @@ function Layout() {
   // A transparent bottom border is included to prevent content from shifting when the
   // visible border appears on hover or active states.
   const navLinkBaseStyle =
-    'flex h-full items-center gap-2 border-b-3 border-transparent px-2 transition-colors duration-200';
+    'flex h-full items-center gap-2 border-b-3 border-transparent px-2 transition-colors duration-200 text-gray-300';
 
   // The style that will be applied for both active and hover states.
-  const activeLinkStyle = 'border-white';
+  const activeLinkStyle = 'border-white text-white';
 
   return (
     <>
