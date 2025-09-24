@@ -9,6 +9,7 @@ export const SatkerProvider = ({ children }) => {
 
   // State global untuk menyimpan ID satker yang sedang aktif/dipilih
   const [selectedSatkerId, setSelectedSatkerId] = useState(null);
+  const [tahunAnggaran, setTahunAnggaran] = useState('');
 
   // Efek ini akan berjalan setiap kali data 'user' berubah (misalnya setelah login)
   useEffect(() => {
@@ -24,7 +25,12 @@ export const SatkerProvider = ({ children }) => {
     }
   }, [user]); // Bergantung pada 'user'
 
-  const value = { selectedSatkerId, setSelectedSatkerId };
+  const value = {
+    selectedSatkerId,
+    setSelectedSatkerId,
+    tahunAnggaran,
+    setTahunAnggaran,
+  };
 
   return (
     <SatkerContext.Provider value={value}>{children}</SatkerContext.Provider>

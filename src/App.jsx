@@ -5,6 +5,7 @@ import DashboardPage from './pages/DashboardPage';
 import Layout from './components/Layout';
 import SpmPage from './pages/SpmPage';
 import LaporanPage from './pages/LaporanPage';
+import SpmCreatePage from './pages/SpmCreatePage';
 
 function App() {
   return (
@@ -22,7 +23,7 @@ function App() {
             }
           >
             <Route index element={<DashboardPage />} />
-            <Route path="/spm" element={<SpmPage />} />
+            <Route path="/spm" element={<SpmCreatePage />} />
             <Route path="/laporan" element={<LaporanPage />} />
           </Route>
         </Routes>
