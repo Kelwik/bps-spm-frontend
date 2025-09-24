@@ -67,25 +67,29 @@ function RincianItem({ itemData, kodeAkunId, onUpdate, onRemove }) {
         )}
         {flags && flags.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {flags.map((flag) => (
-              <div key={flag.id} className="flex flex-col">
-                <label className="mb-1 text-xs text-gray-600">
-                  {flag.nama}
-                </label>
-                <select
-                  value={getFlagValue(flag.nama)}
-                  onChange={(e) => handleFlagChange(flag.nama, e.target.value)}
-                  className="input-field-xs"
-                >
-                  <option value="">-- Pilih --</option>
-                  <option value="IYA">Iya</option>
-                  <option value="TIDAK">Tidak</option>
-                  {flag.tipe === 'IYA_TIDAK' && (
-                    <option value="IYA_TIDAK">Iya/Tidak</option>
-                  )}
-                </select>
-              </div>
-            ))}
+            {flags
+              .filter((flag) => flag.tipe !== 'TIDAK')
+              .map((flag) => (
+                <div key={flag.id} className="flex flex-col">
+                  <label className="mb-1 text-xs text-gray-600">
+                    {flag.nama}
+                  </label>
+                  <select
+                    value={getFlagValue(flag.nama)}
+                    onChange={(e) =>
+                      handleFlagChange(flag.nama, e.target.value)
+                    }
+                    className="input-field-xs"
+                  >
+                    <option value="">-- Pilih --</option>
+                    <option value="IYA">Iya</option>
+                    <option value="TIDAK">Tidak</option>
+                    {flag.tipe === 'IYA_TIDAK' && (
+                      <option value="IYA_TIDAK">Iya/Tidak</option>
+                    )}
+                  </select>
+                </div>
+              ))}
           </div>
         ) : (
           !isLoadingFlags && (
