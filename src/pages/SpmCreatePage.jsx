@@ -1,26 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { useSatker } from '../contexts/SatkerContext';
 import apiClient from '../api';
 import RincianGroup from '../components/RincianGroup';
+import { useQueryClient } from '@tanstack/react-query';
 
 function SpmCreatePage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { selectedSatkerId } = useSatker();
+  const { selectedSatkerId, tahunAnggaran: selectedYear } = useSatker();
 
-  const [nomorSpm, setNomorSpm] = useState('');
-  const [tanggal, setTanggal] = useState(
-    new Date().toISOString().split('T')[0]
-  );
-  const [tahunAnggaran, setTahunAnggaran] = useState(new Date().getFullYear());
+  // Helper: today but force year to selectedYear
+  const getDefaultTanggal = (year) => {
+    const today = new Date();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const [spmData, setSpmData] = useState({
+    nomorSpm: '',
+    tanggal: getDefaultTanggal(selectedYear),
+    tahunAnggaran: selectedYear,
+  });
+
   const [rincianGroups, setRincianGroups] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const targetSatkerId =
-    user.role === 'op_satker' ? user.satkerId : selectedSatkerId;
+  // ✅ Update tanggal whenever tahunAnggaran from context changes
+  useEffect(() => {
+    setSpmData((prev) => ({
+      ...prev,
+      tanggal: getDefaultTanggal(selectedYear),
+      tahunAnggaran: selectedYear,
+    }));
+  }, [selectedYear]);
 
   const handleAddGroup = () => {
     setRincianGroups([
@@ -30,13 +47,19 @@ function SpmCreatePage() {
         kodeProgram: '',
         kodeKegiatan: '',
         kodeAkunId: null,
-        items: [],
+        items: [
+          {
+            id: crypto.randomUUID(),
+            jumlah: 0,
+            jawabanFlags: [],
+          },
+        ],
       },
     ]);
   };
 
   const handleRemoveGroup = (groupId) => {
-    setRincianGroups(rincianGroups.filter((group) => group.id !== groupId));
+    setRincianGroups(rincianGroups.filter((g) => g.id !== groupId));
   };
 
   const handleUpdateGroup = (groupId, updatedData) => {
@@ -47,160 +70,172 @@ function SpmCreatePage() {
     );
   };
 
-  const handleAddItem = (groupId) => {
-    setRincianGroups(
-      rincianGroups.map((group) => {
-        if (group.id === groupId) {
-          return {
-            ...group,
-            items: [
-              ...group.items,
-              { id: crypto.randomUUID(), jumlah: 0, jawabanFlags: [] },
-            ],
-          };
-        }
-        return group;
-      })
-    );
+  const handleSpmDataChange = (e) => {
+    const { name, value } = e.target;
+
+    if (name === 'tanggal') {
+      // if user changes date, keep month/day but force year = selectedYear
+      const chosenDate = new Date(value);
+      const forcedDate = new Date(
+        selectedYear,
+        chosenDate.getMonth(),
+        chosenDate.getDate()
+      );
+      setSpmData((prev) => ({
+        ...prev,
+        tanggal: forcedDate.toISOString().split('T')[0],
+      }));
+    } else {
+      setSpmData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    const targetSatkerId =
+      user.role === 'op_satker' ? user.satkerId : selectedSatkerId;
     if (!targetSatkerId) {
       setError(
         'Untuk admin provinsi, silakan pilih Satker terlebih dahulu di dashboard.'
       );
+      setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
-
-    const flatRincian = rincianGroups.flatMap((group) =>
+    const rincianForApi = rincianGroups.flatMap((group) =>
       group.items.map((item) => ({
         kodeProgram: group.kodeProgram,
         kodeKegiatan: group.kodeKegiatan,
-        kodeAkunId: group.kodeAkunId,
-        jumlah: item.jumlah,
+        kodeAkunId: parseInt(group.kodeAkunId),
+        jumlah: parseInt(item.jumlah),
         jawabanFlags: item.jawabanFlags,
       }))
     );
 
+    const finalPayload = {
+      ...spmData,
+      tahunAnggaran: parseInt(selectedYear), // ✅ always from context
+      satkerId: targetSatkerId,
+      rincian: rincianForApi,
+    };
+
     try {
-      await apiClient.post('/spm', {
-        nomorSpm,
-        tanggal,
-        tahunAnggaran,
-        satkerId: targetSatkerId,
-        rincian: flatRincian,
-      });
-      navigate('/spm');
+      await apiClient.post('/spm', finalPayload);
+      queryClient.invalidateQueries(['spms']);
+      queryClient.invalidateQueries(['allRincian']);
+      navigate('/');
     } catch (err) {
-      setError(err.response?.data?.error || 'Gagal menyimpan SPM.');
+      const errorMessage =
+        err.response?.data?.error || 'Terjadi kesalahan saat menyimpan SPM.';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 bg-gray-50 min-h-screen">
-      <div className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-md">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">Buat SPM Baru</h1>
+    <div className="p-6 bg-slate-50 min-h-screen">
+      <div className="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow-lg">
+        <h1 className="text-3xl font-bold text-slate-800 mb-2">
+          Buat SPM Baru
+        </h1>
+        <p className="text-slate-500 mb-8">
+          Isi detail SPM dan tambahkan rincian belanja.
+        </p>
+
+        {error && (
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-md">
+            <p className="font-bold">Error</p>
+            <p>{error}</p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-8">
-          <fieldset className="border border-gray-300 p-4 rounded-md">
-            <legend className="text-lg font-semibold text-gray-700 px-2">
-              Data Utama SPM
-            </legend>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
-              <div className="flex flex-col">
-                <label
-                  htmlFor="nomorSpm"
-                  className="mb-2 font-medium text-gray-700"
-                >
+          <div className="p-6 border border-slate-200 rounded-lg">
+            <h2 className="text-xl font-semibold text-slate-700 mb-4">
+              Informasi Utama
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-600 mb-1">
                   Nomor SPM
                 </label>
                 <input
                   type="text"
-                  id="nomorSpm"
-                  value={nomorSpm}
-                  onChange={(e) => setNomorSpm(e.target.value)}
+                  name="nomorSpm"
+                  value={spmData.nomorSpm}
+                  onChange={handleSpmDataChange}
+                  className="form-input"
                   required
-                  className="input-field"
                 />
               </div>
-              <div className="flex flex-col">
-                <label
-                  htmlFor="tanggal"
-                  className="mb-2 font-medium text-gray-700"
-                >
+              <div>
+                <label className="block text-sm font-medium text-slate-600 mb-1">
                   Tanggal
                 </label>
                 <input
                   type="date"
-                  id="tanggal"
-                  value={tanggal}
-                  onChange={(e) => setTanggal(e.target.value)}
+                  name="tanggal"
+                  value={spmData.tanggal}
+                  min={`${selectedYear}-01-01`}
+                  max={`${selectedYear}-12-31`}
+                  onChange={handleSpmDataChange}
+                  className="form-input"
                   required
-                  className="input-field"
                 />
               </div>
-              <div className="flex flex-col">
-                <label
-                  htmlFor="tahunAnggaran"
-                  className="mb-2 font-medium text-gray-700"
-                >
+              <div>
+                <label className="block text-sm font-medium text-slate-600 mb-1">
                   Tahun Anggaran
                 </label>
                 <input
                   type="number"
-                  id="tahunAnggaran"
-                  value={tahunAnggaran}
-                  onChange={(e) => setTahunAnggaran(parseInt(e.target.value))}
-                  required
-                  className="input-field"
+                  name="tahunAnggaran"
+                  value={selectedYear} // ✅ locked to context
+                  disabled
+                  className="form-input"
                 />
               </div>
             </div>
-            <p className="mt-4 text-sm text-gray-600">
-              Satker Target:{' '}
-              <strong className="font-semibold text-gray-800">
-                {targetSatkerId || 'Belum Dipilih'}
-              </strong>
-            </p>
-          </fieldset>
+          </div>
 
-          <fieldset className="border border-gray-300 p-4 rounded-md">
-            <legend className="text-lg font-semibold text-gray-700 px-2">
-              Rincian
-            </legend>
-            <div className="space-y-6 mt-4">
-              {rincianGroups.map((group) => (
+          {/* Rincian */}
+          <div>
+            <h2 className="text-xl font-semibold text-slate-700 mb-4">
+              Daftar Rincian
+            </h2>
+            <div className="space-y-6">
+              {rincianGroups.map((group, index) => (
                 <RincianGroup
                   key={group.id}
                   groupData={group}
                   onUpdate={handleUpdateGroup}
-                  onRemove={handleRemoveGroup}
-                  onAddItem={handleAddItem}
-                  setRincianGroups={setRincianGroups}
+                  onRemove={() => handleRemoveGroup(group.id)}
+                  isFirst={index === 0}
                 />
               ))}
             </div>
             <button
               type="button"
               onClick={handleAddGroup}
-              className="btn-secondary mt-6"
+              className="mt-6 flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
             >
-              + Tambah Kelompok Rincian (Beda Kode Akun)
+              ➕ Tambah Kelompok Rincian (Beda Kode Akun)
             </button>
-          </fieldset>
+          </div>
 
-          {error && (
-            <div className="p-3 bg-red-100 text-red-700 rounded-md text-center">
-              {error}
-            </div>
-          )}
-
-          <div className="flex justify-end pt-4">
+          {/* Actions */}
+          <div className="pt-6 border-t border-slate-200 flex justify-end gap-4">
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="btn-secondary"
+            >
+              Batal
+            </button>
             <button type="submit" className="btn-primary" disabled={isLoading}>
               {isLoading ? 'Menyimpan...' : 'Simpan SPM'}
             </button>
