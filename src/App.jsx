@@ -29,6 +29,7 @@ function App() {
 
             <Route path="/laporan" element={<LaporanPage />} />
             <Route path="spm/:id/edit" element={<SpmCreatePage isEditMode />} />
+            <Route path="spm/baru" element={<SpmCreatePage />} />
           </Route>
         </Routes>
       </BrowserRouter>
