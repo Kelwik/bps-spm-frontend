@@ -10,30 +10,28 @@ import SpmCreatePage from './pages/SpmCreatePage';
 
 function App() {
   return (
-    <>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
 
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<DashboardPage />} />
-            <Route path="/spm" element={<SpmPage />} />
-            <Route path="/rincian" element={<SpmDetailPage />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<DashboardPage />} />
+          <Route path="/spm" element={<SpmPage />} />
+          <Route path="/rincian" element={<SpmDetailPage />} />
 
-            <Route path="/laporan" element={<LaporanPage />} />
-            <Route path="spm/:id/edit" element={<SpmCreatePage isEditMode />} />
-            <Route path="spm/baru" element={<SpmCreatePage />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </>
+          <Route path="/laporan" element={<LaporanPage />} />
+          <Route path="spm/:id/edit" element={<SpmCreatePage isEditMode />} />
+          <Route path="spm/baru" element={<SpmCreatePage />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }
 

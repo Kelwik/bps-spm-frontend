@@ -22,9 +22,8 @@ const formatCurrency = (number) => {
 
 function SpmListPage() {
   const queryClient = useQueryClient();
-  const { user } = useAuth(); // Dapatkan info user untuk hak akses
+  const { user } = useAuth();
 
-  // 1. Mengambil data SPM dari API
   const {
     data: spms,
     isLoading,
@@ -38,24 +37,19 @@ function SpmListPage() {
     },
   });
 
-  // 2. Setup mutasi untuk menghapus SPM
   const deleteSpmMutation = useMutation({
     mutationFn: (spmId) => apiClient.delete(`/spm/${spmId}`),
     onSuccess: () => {
-      // Jika berhasil, segarkan kembali data di tabel
       queryClient.invalidateQueries({ queryKey: ['spms'] });
-      // Anda mungkin juga ingin menyegarkan daftar rincian jika ada
       queryClient.invalidateQueries({ queryKey: ['allRincian'] });
     },
     onError: (error) => {
-      // Tampilkan notifikasi error (bisa diganti dengan library notifikasi)
       alert(
         `Gagal menghapus SPM: ${error.response?.data?.error || error.message}`
       );
     },
   });
 
-  // Fungsi yang dipanggil saat tombol hapus diklik
   const handleDelete = (spmId, nomorSpm) => {
     if (
       window.confirm(
@@ -67,9 +61,9 @@ function SpmListPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 bg-slate-50 min-h-screen">
+    <div className="p-4 md:p-6 bg-slate-50 min-h-screen overflow-x-hidden">
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-slate-800">
               Daftar SPM
@@ -78,7 +72,7 @@ function SpmListPage() {
               Kelola semua Surat Perintah Membayar.
             </p>
           </div>
-          <Link to="/spm/baru" className="btn-primary">
+          <Link to="/spm/baru" className="btn-primary w-full md:w-auto">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="h-5 w-5"
@@ -110,38 +104,37 @@ function SpmListPage() {
                   <tr>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider"
+                      className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider"
                     >
                       Nomor SPM
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider"
+                      className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider"
                     >
                       Tanggal
                     </th>
-                    {/* Kolom Satker hanya tampil untuk admin provinsi */}
                     {user && user.role !== 'op_satker' && (
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider"
+                        className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider"
                       >
                         Satker
                       </th>
                     )}
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider"
+                      className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider"
                     >
                       Total Anggaran
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider"
+                      className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider"
                     >
                       Jml. Rincian
                     </th>
-                    <th scope="col" className="relative px-6 py-3">
+                    <th scope="col" className="px-4 py-3 text-right">
                       <span className="sr-only">Aksi</span>
                     </th>
                   </tr>
@@ -151,7 +144,7 @@ function SpmListPage() {
                     <tr>
                       <td
                         colSpan={user && user.role !== 'op_satker' ? 6 : 5}
-                        className="px-6 py-8 text-center text-slate-500"
+                        className="px-4 py-8 text-center text-slate-500"
                       >
                         Tidak ada data SPM yang ditemukan.
                       </td>
@@ -159,24 +152,24 @@ function SpmListPage() {
                   ) : (
                     spms.map((spm) => (
                       <tr key={spm.id} className="hover:bg-slate-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
+                        <td className="px-4 py-4 text-sm font-medium text-slate-900">
                           {spm.nomorSpm}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                        <td className="px-4 py-4 text-sm text-slate-600">
                           {formatDate(spm.tanggal)}
                         </td>
                         {user && user.role !== 'op_satker' && (
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                          <td className="px-4 py-4 text-sm text-slate-600">
                             {spm.satker?.nama || 'N/A'}
                           </td>
                         )}
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-mono">
+                        <td className="px-4 py-4 text-sm text-slate-600 font-mono">
                           {formatCurrency(spm.totalAnggaran)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 text-center">
+                        <td className="px-4 py-4 text-sm text-slate-600 text-center">
                           {spm._count?.rincian || 0}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                        <td className="px-4 py-4 text-right text-sm font-medium space-x-2">
                           <Link
                             to={`/spm/${spm.id}/edit`}
                             className="text-indigo-600 hover:text-indigo-900"
