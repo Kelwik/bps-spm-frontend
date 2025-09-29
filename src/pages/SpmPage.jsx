@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import apiClient from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import StatusBadge from '../components/StatusBadge';
 
 // Helper untuk format tanggal dan mata uang
 const formatDate = (dateString) => {
@@ -134,6 +135,12 @@ function SpmListPage() {
                     >
                       Jml. Rincian
                     </th>
+                    <th
+                      scope="col"
+                      className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider"
+                    >
+                      Status
+                    </th>
                     <th scope="col" className="px-4 py-3 text-right">
                       <span className="sr-only">Aksi</span>
                     </th>
@@ -168,6 +175,9 @@ function SpmListPage() {
                         </td>
                         <td className="px-4 py-4 text-sm text-slate-600 text-center">
                           {spm._count?.rincian || 0}
+                        </td>
+                        <td>
+                          <StatusBadge status={spm.status} />
                         </td>
                         <td className="px-4 py-4 text-right text-sm font-medium space-x-2">
                           <Link
