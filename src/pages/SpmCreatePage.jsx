@@ -7,57 +7,76 @@ import RincianGroup from '../components/RincianGroup';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import StatusBadge from '../components/StatusBadge';
 
+// Komponen Halaman untuk membuat atau mengedit SPM
 function SpmCreatePage({ isEditMode = false }) {
-  const { id: spmId } = useParams();
+  const { id: spmId } = useParams(); // Ambil ID dari URL jika dalam mode edit
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { selectedSatkerId, tahunAnggaran: selectedYear } = useSatker();
 
-  // State
+  // --- State Lokal Komponen ---
   const [spmData, setSpmData] = useState({ nomorSpm: '', tanggal: '' });
   const [rincianGroups, setRincianGroups] = useState([]);
   const [error, setError] = useState(null);
 
-  // Query untuk mengambil data SPM saat mode edit
+  // --- Hitung Total Anggaran ---
+  const totalAnggaran = rincianGroups.reduce((sum, group) => {
+    return (
+      sum +
+      group.items.reduce((itemSum, item) => itemSum + (item.jumlah || 0), 0)
+    );
+  }, 0);
+
+  // --- Pengambilan Data untuk Mode Edit ---
   const { data: existingSpmData, isLoading: isLoadingSpm } = useQuery({
     queryKey: ['spm', spmId],
-    queryFn: async () => apiClient.get(`/spm/${spmId}`).then((res) => res.data),
+    queryFn: async () => {
+      const res = await apiClient.get(`/spm/${spmId}`);
+      return res.data;
+    },
+    // Hanya jalankan query ini jika dalam mode edit dan spmId ada
     enabled: isEditMode && !!spmId,
   });
 
-  // Efek untuk mengisi form dari data yang ada
+  // --- Efek untuk Mengisi Form Saat Data Edit Tersedia ---
   useEffect(() => {
     if (isEditMode && existingSpmData) {
+      // 1. Isi data utama SPM
       setSpmData({
         nomorSpm: existingSpmData.nomorSpm,
+        // Format tanggal dari ISO string (YYYY-MM-DDTHH:mm:ss.sssZ) ke YYYY-MM-DD
         tanggal: new Date(existingSpmData.tanggal).toISOString().split('T')[0],
         tahunAnggaran: existingSpmData.tahunAnggaran,
       });
+
+      // 2. Transformasi data rincian dari format 'datar' ke format 'bertingkat'
       const grouped = existingSpmData.rincian.reduce((acc, rincian) => {
         const groupKey = `${rincian.kodeProgram}-${rincian.kodeKegiatan}-${rincian.kodeAkunId}`;
         if (!acc[groupKey]) {
           acc[groupKey] = {
-            id: crypto.randomUUID(),
+            id: crypto.randomUUID(), // Buat ID sementara untuk grup
             kodeProgram: rincian.kodeProgram,
             kodeKegiatan: rincian.kodeKegiatan,
             kodeAkunId: rincian.kodeAkunId,
             items: [],
           };
         }
-        acc[groupKey].items.push({ ...rincian });
+        acc[groupKey].items.push({ ...rincian }); // 'id' rincian berasal dari database
         return acc;
       }, {});
       setRincianGroups(Object.values(grouped));
     }
   }, [isEditMode, existingSpmData]);
 
-  // Mutasi untuk menyimpan atau mengupdate SPM
+  // --- Logika Mutasi (Create/Update/Validate) ---
   const { mutate: saveSpm, isPending: isSaving } = useMutation({
-    mutationFn: (payload) =>
-      isEditMode
-        ? apiClient.put(`/spm/${spmId}`, payload)
-        : apiClient.post('/spm', payload),
+    mutationFn: (payload) => {
+      if (isEditMode) {
+        return apiClient.put(`/spm/${spmId}`, payload);
+      }
+      return apiClient.post('/spm', payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['spms'] });
       queryClient.invalidateQueries({ queryKey: ['allRincian'] });
@@ -73,7 +92,6 @@ function SpmCreatePage({ isEditMode = false }) {
     },
   });
 
-  // Mutasi untuk update status
   const updateStatusMutation = useMutation({
     mutationFn: ({ status }) =>
       apiClient.patch(`/spm/${spmId}/status`, { status }),
@@ -82,21 +100,11 @@ function SpmCreatePage({ isEditMode = false }) {
       queryClient.invalidateQueries({ queryKey: ['spm', spmId] });
       navigate('/spm');
     },
-    onError: (err) => {
-      setError(err.response?.data?.error || 'Gagal memperbarui status SPM.');
-    },
+    onError: (err) =>
+      setError(err.response?.data?.error || 'Gagal memperbarui status SPM.'),
   });
 
-  const handleStatusUpdate = (newStatus) => {
-    const action = newStatus === 'DITERIMA' ? 'menerima' : 'menolak';
-    if (window.confirm(`Apakah Anda yakin ingin ${action} SPM ini?`)) {
-      updateStatusMutation.mutate({ status: newStatus });
-    }
-  };
-
-  const isFormDisabled = isEditMode && existingSpmData?.status === 'DITERIMA';
-
-  // Handlers untuk form
+  // --- Handler untuk Form ---
   const handleSpmDataChange = (e) => {
     setSpmData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
@@ -137,6 +145,13 @@ function SpmCreatePage({ isEditMode = false }) {
     );
   };
 
+  const handleStatusUpdate = (newStatus) => {
+    const action = newStatus === 'DITERIMA' ? 'menerima' : 'menolak';
+    if (window.confirm(`Apakah Anda yakin ingin ${action} SPM ini?`)) {
+      updateStatusMutation.mutate({ status: newStatus });
+    }
+  };
+
   const handleSubmit = (event) => {
     event.preventDefault();
     setError(null);
@@ -150,9 +165,10 @@ function SpmCreatePage({ isEditMode = false }) {
       return;
     }
 
+    // Meratakan kembali data rincian untuk dikirim ke API
     const rincianForApi = rincianGroups.flatMap((group) =>
       group.items.map((item) => ({
-        id: isEditMode ? item.id : undefined,
+        id: isEditMode ? item.id : undefined, // Sertakan ID hanya jika mode edit
         kodeProgram: group.kodeProgram,
         kodeKegiatan: group.kodeKegiatan,
         kodeAkunId: group.kodeAkunId,
@@ -178,8 +194,19 @@ function SpmCreatePage({ isEditMode = false }) {
     saveSpm(finalPayload);
   };
 
+  // --- Kondisi Tampilan UI ---
+  const isFormDisabled = isEditMode && existingSpmData?.status === 'DITERIMA';
+  const showValidationButtons =
+    isEditMode &&
+    ['op_prov', 'supervisor'].includes(user.role) &&
+    existingSpmData?.status === 'MENUNGGU';
+  const showSaveButtons = !isFormDisabled;
+
+  // Tampilan Loading
   if (isEditMode && isLoadingSpm) {
-    return <div className="p-4 text-center">Memuat data SPM...</div>;
+    return (
+      <div className="p-4 text-center">Memuat data SPM untuk diedit...</div>
+    );
   }
 
   return (
@@ -203,14 +230,12 @@ function SpmCreatePage({ isEditMode = false }) {
 
         {isFormDisabled && (
           <div className="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4 mb-6 rounded-md">
-            <p className="font-semibold">Informasi</p>
             <p>
               SPM ini sudah <strong>Diterima</strong> dan tidak dapat diubah
               lagi.
             </p>
           </div>
         )}
-
         {error && (
           <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-md">
             <p className="font-semibold">Error</p>
@@ -221,7 +246,10 @@ function SpmCreatePage({ isEditMode = false }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={isFormDisabled}>
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <h2 className="text-lg md:text-xl font-semibold text-blue-800 mb-4">
+                Informasi Utama
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Nomor SPM
@@ -231,7 +259,7 @@ function SpmCreatePage({ isEditMode = false }) {
                     name="nomorSpm"
                     value={spmData.nomorSpm}
                     onChange={handleSpmDataChange}
-                    className="w-full p-2 md:p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="form-input"
                     required
                   />
                 </div>
@@ -244,7 +272,7 @@ function SpmCreatePage({ isEditMode = false }) {
                     name="tanggal"
                     value={spmData.tanggal}
                     onChange={handleSpmDataChange}
-                    className="w-full p-2 md:p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="form-input"
                     required
                   />
                 </div>
@@ -257,7 +285,18 @@ function SpmCreatePage({ isEditMode = false }) {
                     name="tahunAnggaran"
                     value={isEditMode ? spmData.tahunAnggaran : selectedYear}
                     disabled
-                    className="w-full p-2 md:p-3 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
+                    className="form-input-disabled"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Total Anggaran
+                  </label>
+                  <input
+                    type="text"
+                    value={`Rp ${totalAnggaran.toLocaleString('id-ID')}`}
+                    disabled
+                    className="form-input-disabled font-semibold text-blue-800"
                   />
                 </div>
               </div>
@@ -283,63 +322,52 @@ function SpmCreatePage({ isEditMode = false }) {
                 onClick={handleAddGroup}
                 className="mt-4 inline-flex items-center px-3 py-2 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
               >
-                <svg
-                  className="w-4 h-4 mr-1 shrink-0"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Tambah Kelompok Rincian
+                ➕ Tambah Kelompok Rincian
               </button>
             </div>
           </fieldset>
 
-          {isEditMode &&
-            ['op_prov', 'supervisor'].includes(user.role) &&
-            existingSpmData?.status === 'MENUNGGU' && (
-              <div className="pt-4 border-t border-gray-200 flex flex-col sm:flex-row justify-end gap-4">
-                <button
-                  type="button"
-                  onClick={() => handleStatusUpdate('DITOLAK')}
-                  disabled={updateStatusMutation.isPending}
-                  className="btn-danger w-full sm:w-auto"
-                >
-                  {updateStatusMutation.isPending
-                    ? 'Memproses...'
-                    : 'Tolak & Kembalikan'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleStatusUpdate('DITERIMA')}
-                  disabled={updateStatusMutation.isPending}
-                  className="btn-success w-full sm:w-auto"
-                >
-                  {updateStatusMutation.isPending
-                    ? 'Memproses...'
-                    : 'Terima & Finalisasi'}
-                </button>
-              </div>
-            )}
-
-          {!isFormDisabled && (
+          {/* Tombol Aksi Validasi (hanya untuk op_prov) */}
+          {showValidationButtons && (
             <div className="pt-4 border-t border-gray-200 flex flex-col sm:flex-row justify-end gap-4">
               <button
                 type="button"
-                onClick={() => navigate(isEditMode ? '/spm' : '/')}
-                className="w-full sm:w-auto px-3 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
+                onClick={() => handleStatusUpdate('DITOLAK')}
+                disabled={updateStatusMutation.isPending}
+                className="btn-danger w-full sm:w-auto"
+              >
+                {updateStatusMutation.isPending
+                  ? 'Memproses...'
+                  : 'Tolak & Kembalikan'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleStatusUpdate('DITERIMA')}
+                disabled={updateStatusMutation.isPending}
+                className="btn-success w-full sm:w-auto"
+              >
+                {updateStatusMutation.isPending
+                  ? 'Memproses...'
+                  : 'Terima & Finalisasi'}
+              </button>
+            </div>
+          )}
+
+          {/* Tombol Simpan/Update */}
+          {showSaveButtons && (
+            <div
+              className={`pt-4 ${
+                showValidationButtons ? '' : 'border-t border-gray-200'
+              } flex flex-col sm:flex-row justify-end gap-4`}
+            >
+              <button
+                type="button"
+                onClick={() => navigate('/spm')}
+                className="btn-secondary"
               >
                 Batal
               </button>
-              <button
-                type="submit"
-                className="w-full sm:w-auto px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                disabled={isSaving}
-              >
+              <button type="submit" className="btn-primary" disabled={isSaving}>
                 {isSaving
                   ? isEditMode
                     ? 'Memperbarui...'

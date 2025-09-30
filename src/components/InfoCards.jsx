@@ -1,6 +1,10 @@
 import { Check, Clock4, FileSpreadsheet, X } from 'lucide-react';
 
 function InfoCards({ data }) {
+  const disetujui = data.filter((spm) => spm.status === 'DITERIMA');
+  const menunggu = data.filter((spm) => spm.status === 'MENUNGGU');
+  const ditolak = data.filter((spm) => spm.status === 'DITOLAK');
+
   return (
     <div className="flex w-full gap-4">
       <div className="p-4 py-6 bg-white flex gap-2 w-1/4 font-lato border-t-8 shadow-md border-bpsBlue rounded-lg">
@@ -26,7 +30,7 @@ function InfoCards({ data }) {
         </div>
         <div>
           <h1 className="font-bold text-sm">Disetujui</h1>
-          <p className="font-black text-lg">124</p>
+          <p className="font-black text-lg">{disetujui.length}</p>
         </div>
       </div>
       <div className="p-4 py-6 bg-white flex gap-2 w-1/4 font-lato border-t-8 shadow-md border-[#f44336] rounded-lg">
@@ -39,7 +43,7 @@ function InfoCards({ data }) {
         </div>
         <div>
           <h1 className="font-bold text-sm">Ditolak</h1>
-          <p className="font-black text-lg">10</p>
+          <p className="font-black text-lg">{ditolak.length}</p>
         </div>
       </div>
       <div className="p-4 py-6 bg-white flex gap-2 w-1/4 font-lato border-t-8 shadow-md border-[#ff9800] rounded-lg">
@@ -52,7 +56,7 @@ function InfoCards({ data }) {
         </div>
         <div>
           <h1 className="font-bold text-sm">Menunggu</h1>
-          <p className="font-black text-lg">26</p>
+          <p className="font-black text-lg">{menunggu.length}</p>
         </div>
       </div>
     </div>
