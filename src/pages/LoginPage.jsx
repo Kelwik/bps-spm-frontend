@@ -63,7 +63,7 @@ function LoginPage() {
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
               />
               <input
-                type="email"
+                type=""
                 className="w-full h-12 border border-gray-300 rounded-lg p-2 pl-10 focus:outline-none focus:ring-2 focus:ring-bpsBlue"
                 placeholder="Masukkan E-mail Anda"
                 value={email}
