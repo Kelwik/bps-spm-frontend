@@ -6,8 +6,8 @@ function StatusBadge({ status }) {
   };
 
   const statusText = {
-    MENUNGGU: 'Menunggu Persetujuan',
-    DITOLAK: 'Ditolak (Perlu Revisi)',
+    MENUNGGU: 'Menunggu',
+    DITOLAK: 'Ditolak',
     DITERIMA: 'Diterima',
   };
 

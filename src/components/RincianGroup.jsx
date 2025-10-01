@@ -1,30 +1,27 @@
 import RincianItem from './RincianItem';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api';
+import { Plus, Trash2 } from 'lucide-react';
 
 function RincianGroup({ groupData, onUpdate, onRemove, isFirst }) {
   const { data: kodeAkunList, isLoading: isLoadingKodeAkun } = useQuery({
     queryKey: ['kodeAkun'],
-    queryFn: async () => {
-      const res = await apiClient.get('/kode-akun');
-      return res.data;
-    },
+    queryFn: async () => apiClient.get('/kode-akun').then((res) => res.data),
   });
 
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field, value) =>
     onUpdate(groupData.id, { [field]: value });
-  };
 
   const handleAddItem = () => {
     const newItem = {
       id: crypto.randomUUID(),
       jumlah: 0,
+      jawabanFlags: [],
       kodeKRO: '',
       kodeRO: '',
       kodeKomponen: '',
       kodeSubkomponen: '',
       uraian: '',
-      jawabanFlags: [],
     };
     onUpdate(groupData.id, { items: [...groupData.items, newItem] });
   };
@@ -42,86 +39,60 @@ function RincianGroup({ groupData, onUpdate, onRemove, isFirst }) {
   };
 
   return (
-    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg shadow-sm overflow-hidden">
+    <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 relative space-y-4">
       {!isFirst && (
         <button
           type="button"
           onClick={onRemove}
-          className="mb-1 text-red-500 hover:text-red-700 transition-colors"
+          className="absolute -top-3 -right-3 text-slate-400 bg-white hover:text-red-600 hover:bg-red-100 p-1 rounded-full shadow transition-colors"
+          title="Hapus Kelompok Rincian"
         >
-          {/* x icon */}
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5 shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
+          <Trash2 size={16} />
         </button>
       )}
 
-      {/* note: add min-w-0 to child wrappers so long content can shrink */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 mb-1">
-        <div className="min-w-0">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Kode Program
-          </label>
-          <input
-            type="text"
-            value={groupData.kodeProgram}
-            onChange={(e) => handleInputChange('kodeProgram', e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            required
-          />
-        </div>
-
-        <div className="min-w-0">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Kode Kegiatan
-          </label>
-          <input
-            type="text"
-            value={groupData.kodeKegiatan}
-            onChange={(e) => handleInputChange('kodeKegiatan', e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            required
-          />
-        </div>
-
-        <div className="min-w-0">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Kode Akun
-          </label>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label className="form-label">Kode Akun</label>
           <select
             value={groupData.kodeAkunId || ''}
             onChange={(e) => handleInputChange('kodeAkunId', e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base min-w-0 truncate"
+            className="form-input"
             required
           >
             <option value="" disabled>
               {isLoadingKodeAkun ? 'Memuat...' : 'Pilih Kode Akun'}
             </option>
             {kodeAkunList?.map((akun) => (
-              <option
-                key={akun.id}
-                value={akun.id}
-                title={`${akun.kode} - ${akun.nama}`} // full text on hover
-              >
+              <option key={akun.id} value={akun.id}>
                 {akun.kode} - {akun.nama}
               </option>
             ))}
           </select>
         </div>
+        <div>
+          <label className="form-label">Kode Program</label>
+          <input
+            type="text"
+            value={groupData.kodeProgram}
+            onChange={(e) => handleInputChange('kodeProgram', e.target.value)}
+            className="form-input"
+            required
+          />
+        </div>
+        <div>
+          <label className="form-label">Kode Kegiatan</label>
+          <input
+            type="text"
+            value={groupData.kodeKegiatan}
+            onChange={(e) => handleInputChange('kodeKegiatan', e.target.value)}
+            className="form-input"
+            required
+          />
+        </div>
       </div>
 
-      <div className="space-y-1">
+      <div className="space-y-4 pt-4 border-t border-slate-200">
         {groupData.items.map((item) => (
           <RincianItem
             key={item.id}
@@ -137,20 +108,9 @@ function RincianGroup({ groupData, onUpdate, onRemove, isFirst }) {
       <button
         type="button"
         onClick={handleAddItem}
-        className="mt-1 inline-flex items-center px-3 py-2 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
+        className="btn-primary btn-sm"
       >
-        <svg
-          className="w-4 h-4 mr-1 shrink-0"
-          fill="currentColor"
-          viewBox="0 0 20 20"
-        >
-          <path
-            fillRule="evenodd"
-            d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
-            clipRule="evenodd"
-          />
-        </svg>
-        Tambah Rincian (Kode Akun Sama)
+        <Plus size={14} /> Tambah Rincian (Kode Akun Sama)
       </button>
     </div>
   );

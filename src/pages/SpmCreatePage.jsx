@@ -6,15 +6,14 @@ import apiClient from '../api';
 import RincianGroup from '../components/RincianGroup';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import StatusBadge from '../components/StatusBadge';
+import { Plus } from 'lucide-react';
 
-// Helper untuk format mata uang
-const formatCurrency = (number) => {
-  return new Intl.NumberFormat('id-ID', {
+const formatCurrency = (number) =>
+  new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
     minimumFractionDigits: 0,
   }).format(number || 0);
-};
 
 function SpmCreatePage({ isEditMode = false }) {
   const { id: spmId } = useParams();
@@ -23,17 +22,16 @@ function SpmCreatePage({ isEditMode = false }) {
   const { user } = useAuth();
   const { selectedSatkerId, tahunAnggaran: selectedYear } = useSatker();
 
-  // --- LOGIKA BARU: FUNGSI UNTUK MEMAKSA TAHUN ---
-  // Fungsi ini mengambil tanggal hari ini, tetapi mengganti tahunnya
-  // dengan tahun yang dipilih di context.
+  // --- PERBAIKAN LOGIKA TANGGAL: Fungsi untuk membuat string tanggal ---
   const getDefaultTanggal = (year) => {
+    if (!year) return '';
     const today = new Date();
-    // Buat tanggal baru dengan TAHUN dari context, BULAN & TANGGAL dari hari ini
-    const forcedDate = new Date(year, today.getMonth(), today.getDate());
-    return forcedDate.toISOString().split('T')[0]; // Format ke YYYY-MM-DD
+    // Ambil bulan & hari, pastikan formatnya 2 digit (misal: 09)
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`; // Langsung buat string YYYY-MM-DD
   };
 
-  // State untuk data utama SPM, sekarang menggunakan tanggal default yang baru
   const [spmData, setSpmData] = useState({
     nomorSpm: '',
     tanggal: getDefaultTanggal(selectedYear),
@@ -43,7 +41,6 @@ function SpmCreatePage({ isEditMode = false }) {
   const [rincianGroups, setRincianGroups] = useState([]);
   const [error, setError] = useState(null);
 
-  // Efek untuk menyinkronkan tanggal jika tahun anggaran global berubah
   useEffect(() => {
     setSpmData((prev) => ({
       ...prev,
@@ -52,32 +49,22 @@ function SpmCreatePage({ isEditMode = false }) {
     }));
   }, [selectedYear]);
 
-  // --- LOGIKA BARU: FUNGSI UNTUK MENANGANI PERUBAHAN TANGGAL ---
+  // --- PERBAIKAN LOGIKA TANGGAL: Handler perubahan input tanggal ---
   const handleSpmDataChange = (e) => {
-    const { name, value } = e.target;
-
+    const { name, value } = e.target; // value akan dalam format "YYYY-MM-DD"
     if (name === 'tanggal') {
-      // Jika pengguna mengubah tanggal, kita tetap paksa tahunnya
-      const chosenDate = new Date(value);
-      const forcedDate = new Date(
-        selectedYear, // Selalu gunakan tahun dari context
-        chosenDate.getMonth(),
-        chosenDate.getDate()
-      );
-      setSpmData((prev) => ({
-        ...prev,
-        tanggal: forcedDate.toISOString().split('T')[0],
-      }));
+      const [, month, day] = value.split('-'); // Ambil bulan dan hari dari pilihan user
+      const forcedDateString = `${selectedYear}-${month}-${day}`; // Gabungkan dengan tahun dari context
+      setSpmData((prev) => ({ ...prev, tanggal: forcedDateString }));
     } else {
       setSpmData((prev) => ({ ...prev, [name]: value }));
     }
   };
 
-  // (Sisa logika state, query, dan handler lainnya tetap sama)
+  // (Sisa logika state, query, dan handler lainnya tidak berubah)
   const totalAnggaran = rincianGroups
-    .flatMap((group) => group.items)
-    .reduce((total, item) => total + (Number(item.jumlah) || 0), 0);
-
+    .flatMap((g) => g.items)
+    .reduce((sum, item) => sum + (Number(item.jumlah) || 0), 0);
   const { data: existingSpmData, isLoading: isLoadingSpm } = useQuery({
     queryKey: ['spm', spmId],
     queryFn: async () => apiClient.get(`/spm/${spmId}`).then((res) => res.data),
@@ -223,132 +210,120 @@ function SpmCreatePage({ isEditMode = false }) {
   const showSaveButtons = !isFormDisabled;
 
   if (isEditMode && isLoadingSpm) {
-    return <div className="p-4 text-center">Memuat data SPM...</div>;
+    return <div className="p-6 text-center">Memuat data SPM...</div>;
   }
 
   return (
-    <div className="mt-8 mx-4 md:mx-8 overflow-x-hidden">
-      <div className="bg-white p-4 md:p-6 rounded-lg shadow-md max-w-6xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-4">
-          <div className="mb-4 sm:mb-0">
-            <h1 className="text-2xl md:text-3xl font-bold text-blue-900">
-              {isEditMode ? 'Detail / Edit SPM' : 'Buat SPM Baru'}
-            </h1>
-            <p className="text-gray-600">
-              {isEditMode
-                ? 'Ubah atau verifikasi detail SPM di bawah ini.'
-                : 'Isi detail SPM dan tambahkan rincian belanja.'}
-            </p>
-          </div>
-          {isEditMode && existingSpmData && (
-            <StatusBadge status={existingSpmData.status} />
-          )}
+    <div className="bg-white p-6 rounded-xl shadow-md">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-6">
+        <div className="mb-4 sm:mb-0">
+          <h1 className="text-3xl font-bold text-gray-800">
+            {isEditMode ? 'Detail / Edit SPM' : 'Buat SPM Baru'}
+          </h1>
+          <p className="text-gray-500 mt-1">
+            {isEditMode
+              ? 'Ubah atau verifikasi detail SPM di bawah ini.'
+              : 'Isi detail SPM dan tambahkan rincian belanja.'}
+          </p>
         </div>
-        {isFormDisabled && (
-          <div className="bg-blue-50 p-4 mb-6 rounded-md">
-            SPM ini sudah <strong>Diterima</strong>.
-          </div>
+        {isEditMode && existingSpmData && (
+          <StatusBadge status={existingSpmData.status} />
         )}
-        {error && <div className="bg-red-50 p-4 mb-6 rounded-md">{error}</div>}
+      </div>
+      {isFormDisabled && (
+        <div className="bg-blue-100 p-4 mb-6 rounded-md">
+          SPM ini sudah <strong>Diterima</strong>.
+        </div>
+      )}
+      {error && <div className="bg-red-100 p-4 mb-6 rounded-md">{error}</div>}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <fieldset disabled={isFormDisabled}>
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h2 className="text-lg md:text-xl font-semibold text-blue-800 mb-4">
-                Informasi Utama
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nomor SPM
-                  </label>
-                  <input
-                    type="text"
-                    name="nomorSpm"
-                    value={spmData.nomorSpm}
-                    onChange={handleSpmDataChange}
-                    className="form-input"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tanggal
-                  </label>
-                  <input
-                    type="date"
-                    name="tanggal"
-                    value={spmData.tanggal}
-                    // --- IMPLEMENTASI: Atribut min & max untuk mengunci tahun ---
-                    min={`${selectedYear}-01-01`}
-                    max={`${selectedYear}-12-31`}
-                    onChange={handleSpmDataChange}
-                    className="form-input"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tahun Anggaran
-                  </label>
-                  <input
-                    type="number"
-                    name="tahunAnggaran"
-                    value={isEditMode ? spmData.tahunAnggaran : selectedYear}
-                    disabled
-                    className="form-input-disabled"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Total Anggaran
-                  </label>
-                  <input
-                    type="text"
-                    name="totalAnggaran"
-                    value={formatCurrency(totalAnggaran)}
-                    disabled
-                    className="form-input-disabled font-mono"
-                  />
-                </div>
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <fieldset disabled={isFormDisabled}>
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold text-gray-700 border-b pb-2">
+              Informasi Utama
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div>
+                <label className="form-label">Nomor SPM</label>
+                <input
+                  type="text"
+                  name="nomorSpm"
+                  value={spmData.nomorSpm}
+                  onChange={handleSpmDataChange}
+                  className="form-input"
+                  required
+                />
+              </div>
+              <div>
+                <label className="form-label">Tanggal</label>
+                <input
+                  type="date"
+                  name="tanggal"
+                  value={spmData.tanggal}
+                  min={`${selectedYear}-01-01`}
+                  max={`${selectedYear}-12-31`}
+                  onChange={handleSpmDataChange}
+                  className="form-input"
+                  required
+                />
+              </div>
+              <div>
+                <label className="form-label">Tahun Anggaran</label>
+                <input
+                  type="number"
+                  name="tahunAnggaran"
+                  value={isEditMode ? spmData.tahunAnggaran : selectedYear}
+                  disabled
+                  className="form-input-disabled"
+                />
+              </div>
+              <div>
+                <label className="form-label">Total Anggaran</label>
+                <input
+                  type="text"
+                  value={formatCurrency(totalAnggaran)}
+                  disabled
+                  className="form-input-disabled font-mono text-lg"
+                />
               </div>
             </div>
-            <div>
-              <h2 className="text-lg md:text-xl font-semibold text-blue-800 mb-4">
-                Daftar Rincian
-              </h2>
-              <div className="space-y-4">
-                {rincianGroups.map((group, index) => (
-                  <RincianGroup
-                    key={group.id}
-                    groupData={group}
-                    onUpdate={handleUpdateGroup}
-                    onRemove={() => handleRemoveGroup(group.id)}
-                    isFirst={index === 0}
-                  />
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={handleAddGroup}
-                className="mt-4 inline-flex items-center px-3 py-2 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
-              >
-                ➕ Tambah Kelompok Rincian
-              </button>
+          </div>
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold text-gray-700 border-b pb-2">
+              Daftar Rincian
+            </h2>
+            <div className="space-y-6">
+              {rincianGroups.map((group, index) => (
+                <RincianGroup
+                  key={group.id}
+                  groupData={group}
+                  onUpdate={handleUpdateGroup}
+                  onRemove={() => handleRemoveGroup(group.id)}
+                  isFirst={index === 0}
+                />
+              ))}
             </div>
-          </fieldset>
+            <button
+              type="button"
+              onClick={handleAddGroup}
+              className="btn-secondary"
+            >
+              <Plus size={16} /> Tambah Kelompok Rincian
+            </button>
+          </div>
+        </fieldset>
 
+        <div className="pt-6 border-t flex justify-end gap-4">
           {showValidationButtons && (
-            <div className="pt-4 border-t border-gray-200 flex justify-end gap-4">
+            <>
               <button
                 type="button"
                 onClick={() => handleStatusUpdate('DITOLAK')}
                 disabled={updateStatusMutation.isPending}
                 className="btn-danger"
               >
-                {updateStatusMutation.isPending
-                  ? 'Memproses...'
-                  : 'Tolak & Kembalikan'}
+                Tolak & Kembalikan
               </button>
               <button
                 type="button"
@@ -356,19 +331,12 @@ function SpmCreatePage({ isEditMode = false }) {
                 disabled={updateStatusMutation.isPending}
                 className="btn-success"
               >
-                {updateStatusMutation.isPending
-                  ? 'Memproses...'
-                  : 'Terima & Finalisasi'}
+                Terima & Finalisasi
               </button>
-            </div>
+            </>
           )}
-
           {showSaveButtons && (
-            <div
-              className={`pt-4 ${
-                showValidationButtons ? '' : 'border-t border-gray-200'
-              } flex justify-end gap-4`}
-            >
+            <>
               <button
                 type="button"
                 onClick={() => navigate('/spm')}
@@ -385,10 +353,10 @@ function SpmCreatePage({ isEditMode = false }) {
                   ? 'Update SPM'
                   : 'Simpan SPM'}
               </button>
-            </div>
+            </>
           )}
-        </form>
-      </div>
+        </div>
+      </form>
     </div>
   );
 }
