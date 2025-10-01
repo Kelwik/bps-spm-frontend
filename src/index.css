@@ -1,7 +1,52 @@
-@import url('https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100..900;1,100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 @import 'tailwindcss';
 
 @theme {
+  --font-inter: 'Inter', sans-serif;
   --font-lato: 'Lato', sans-serif;
+
+  /* Make Inter the default sans font */
+  --font-sans: var(--font-inter);
+
   --color-bpsBlue: #002b6a;
+  --color-bpsBlue-light: #007bff;
+  --color-bpsBlue: #005f9e;
+  --color-bpsBlue-dark: #002b6a;
+
+  --color-danger-light: #fef2f2;
+  --color-danger: #dc2626;
+  --color-danger-dark: #b91c1c;
+
+  --color-success-light: #f0fdf4;
+  --color-success: #16a34a;
+  --color-success-dark: #15803d;
+}
+
+body {
+  font-family: var(--font-inter);
+}
+
+.form-input {
+  @apply w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors;
+}
+
+.form-input-disabled {
+  @apply w-full p-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center px-4 py-2 bg-bpsBlue-dark text-white font-semibold rounded-md hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-md hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-danger {
+  @apply inline-flex items-center justify-center px-4 py-2 bg-red-600 text-white font-semibold rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-success {
+  @apply inline-flex items-center justify-center px-4 py-2 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
 }
