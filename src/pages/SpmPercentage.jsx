@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import apiClient from '../api';
 import { useAuth } from '../contexts/AuthContext';
-import PercentageCircle from '../components/PercentageCircle';
+import ProgressBar from '../components/ProgressBar'; // <-- Ganti PercentageCircle dengan ProgressBar
 import StatusBadge from '../components/StatusBadge';
 
 // Helper
@@ -19,7 +19,7 @@ const formatCurrency = (number) =>
     minimumFractionDigits: 0,
   }).format(number);
 
-function SpmPercentage() {
+function SpmCompletenessPage() {
   const { user } = useAuth();
 
   const {
@@ -28,7 +28,7 @@ function SpmPercentage() {
     isError,
     error,
   } = useQuery({
-    queryKey: ['spms'], // Kita gunakan query key yang sama agar data di-cache
+    queryKey: ['spms'],
     queryFn: async () => apiClient.get('/spm').then((res) => res.data),
   });
 
@@ -46,10 +46,14 @@ function SpmPercentage() {
 
         <div className="bg-white p-6 rounded-xl shadow-lg">
           {isLoading && (
-            <p className="text-center text-slate-500">Memuat data laporan...</p>
+            <p className="text-center text-slate-500 py-10">
+              Memuat data laporan...
+            </p>
           )}
           {isError && (
-            <p className="text-center text-red-500">Error: {error.message}</p>
+            <p className="text-center text-red-500 py-10">
+              Error: {error.message}
+            </p>
           )}
 
           {!isLoading && !isError && (
@@ -68,13 +72,13 @@ function SpmPercentage() {
                         Satker
                       </th>
                     )}
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
                       Total Anggaran
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    <th className="w-56 px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                       Kelengkapan Dokumen
                     </th>
                     <th className="relative px-6 py-3">
@@ -106,18 +110,17 @@ function SpmPercentage() {
                             {spm.satker?.nama || 'N/A'}
                           </td>
                         )}
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-mono">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-mono text-right">
                           {formatCurrency(spm.totalAnggaran)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 text-center">
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
                           <StatusBadge status={spm.status} />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex justify-center">
-                            <PercentageCircle
-                              percentage={spm.completenessPercentage}
-                            />
-                          </div>
+                          {/* --- PERUBAHAN DI SINI --- */}
+                          <ProgressBar
+                            percentage={spm.completenessPercentage}
+                          />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <Link
@@ -140,4 +143,4 @@ function SpmPercentage() {
   );
 }
 
-export default SpmPercentage;
+export default SpmCompletenessPage;

@@ -68,7 +68,7 @@ function Layout() {
               {/* 2. Hapus margin-top (mt-2) agar tidak ada celah antara tombol dan menu */}
               <div className="absolute top-full right-0 bg-white rounded-md shadow-lg w-60 z-20 hidden group-hover:block p-2">
                 <NavLink
-                  to="/laporan/spm-completeness"
+                  to="/laporanspm"
                   className={({ isActive }) =>
                     `${dropdownLinkStyle} ${isActive ? 'bg-blue-50' : ''}`
                   }

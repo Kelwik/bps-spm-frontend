@@ -307,7 +307,7 @@ function SpmCreatePage({ isEditMode = false }) {
             <button
               type="button"
               onClick={handleAddGroup}
-              className="btn-secondary"
+              className="btn-primary"
             >
               <Plus size={16} /> Tambah Kelompok Rincian
             </button>

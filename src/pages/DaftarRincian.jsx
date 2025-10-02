@@ -1,112 +1,188 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import apiClient from '../api';
-import PercentageCircle from '../components/PercentageCircle';
+import { useAuth } from '../contexts/AuthContext';
+import ProgressBar from '../components/ProgressBar';
+import StatusBadge from '../components/StatusBadge';
+import { useMemo } from 'react';
+import { Edit, Plus } from 'lucide-react';
 
-const formatCurrency = (number) => {
-  return new Intl.NumberFormat('id-ID', {
+// Helper
+const formatDate = (dateString) =>
+  new Date(dateString).toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+const formatCurrency = (number) =>
+  new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
     minimumFractionDigits: 0,
-  }).format(number);
-};
+  }).format(number || 0);
 
 function AllRincianPage() {
+  const { user } = useAuth();
+
   const {
     data: allRincian,
     isLoading,
+    isError,
     error,
   } = useQuery({
     queryKey: ['allRincian'],
-    queryFn: async () => {
-      const res = await apiClient.get('/rincian');
-      return res.data;
-    },
+    queryFn: async () => apiClient.get('/rincian').then((res) => res.data),
   });
 
+  // Logika pengelompokan data tetap sama, ini sudah efisien
+  const groupedSpms = useMemo(() => {
+    if (!allRincian) return [];
+    const groups = allRincian.reduce((acc, rincian) => {
+      const spmKey = rincian.spm.nomorSpm;
+      if (!acc[spmKey]) {
+        acc[spmKey] = { ...rincian.spm, id: rincian.spmId, rincianItems: [] };
+      }
+      acc[spmKey].rincianItems.push(rincian);
+      return acc;
+    }, {});
+    return Object.values(groups);
+  }, [allRincian]);
+
   if (isLoading)
-    return <div className="p-8 text-center">Memuat daftar rincian...</div>;
-  if (error)
     return (
-      <div className="p-8 text-center text-red-500">
-        Error: {error.response?.data?.error || error.message}
+      <div className="p-8 text-center text-gray-500">
+        Memuat Laporan Rincian...
       </div>
+    );
+  if (isError)
+    return (
+      <div className="p-8 text-center text-red-500">Error: {error.message}</div>
     );
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 bg-gray-50 min-h-screen">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">
-            Semua Rincian SPM
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800">
+            Laporan Semua Rincian
           </h1>
-          <Link to="/spm/baru" className="btn-primary">
-            + Buat SPM Baru
-          </Link>
+          <p className="text-gray-500 mt-1">
+            Daftar terperinci semua item belanja yang dikelompokkan per SPM.
+          </p>
         </div>
+      </div>
 
-        {/* Tabel Rincian */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+      <div className="bg-white rounded-xl shadow-md overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full">
+            <thead className="bg-slate-50">
               <tr>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Nomor SPM
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Info SPM
                 </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Detail Akun
+                {user?.role !== 'op_satker' && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    Satker
+                  </th>
+                )}
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Detail Akun Rincian
                 </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
+                <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Jumlah
                 </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
+                <th className="w-56 px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Kelengkapan
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {allRincian.map((rincian) => (
-                <tr key={rincian.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {rincian.spm.nomorSpm}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {rincian.kodeAkun.nama}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {rincian.kodeProgram}/{rincian.kodeKegiatan}/
-                      {rincian.kodeAkun.kode}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-bold text-indigo-700">
-                      {formatCurrency(rincian.jumlah)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex justify-center">
-                      <PercentageCircle
-                        percentage={rincian.persentaseKelengkapan}
-                      />
-                    </div>
+            <tbody className="bg-white">
+              {groupedSpms.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-center py-10 text-gray-500">
+                    Tidak ada data rincian ditemukan.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                groupedSpms.flatMap((spm, spmIndex) =>
+                  spm.rincianItems.map((rincian, rincianIndex) => (
+                    <tr key={rincian.id} className="border-b border-slate-100">
+                      {/* --- KOLOM SPM (HANYA TAMPIL DI BARIS PERTAMA GRUP) --- */}
+                      {rincianIndex === 0 && (
+                        <td
+                          className={`px-6 py-4 align-top ${
+                            spmIndex > 0 ? 'border-t-2 border-slate-300' : ''
+                          }`}
+                          rowSpan={spm.rincianItems.length}
+                        >
+                          <div className="font-bold text-sm text-gray-900">
+                            {spm.nomorSpm}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {formatDate(spm.tanggal)}
+                          </div>
+                          <div className="mt-2">
+                            <StatusBadge status={spm.status} />
+                          </div>
+                          <Link
+                            to={`/spm/${spm.id}/edit`}
+                            className="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-900 mt-3 font-semibold"
+                          >
+                            <Edit size={12} /> <span>Detail SPM</span>
+                          </Link>
+                        </td>
+                      )}
+                      {rincianIndex === 0 && user?.role !== 'op_satker' && (
+                        <td
+                          className={`px-6 py-4 align-top text-sm text-gray-600 ${
+                            spmIndex > 0 ? 'border-t-2 border-slate-300' : ''
+                          }`}
+                          rowSpan={spm.rincianItems.length}
+                        >
+                          {spm.satker?.nama}
+                        </td>
+                      )}
+
+                      {/* --- KOLOM RINCIAN (SELALU TAMPIL) --- */}
+                      <td
+                        className={`px-6 py-4 align-top ${
+                          rincianIndex === 0 && spmIndex > 0
+                            ? 'border-t-2 border-slate-300'
+                            : ''
+                        }`}
+                      >
+                        <div className="text-sm font-semibold text-gray-800">
+                          {rincian.kodeAkun.nama}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {rincian.kodeProgram}/{rincian.kodeKegiatan}/
+                          {rincian.kodeAkun.kode}
+                        </div>
+                      </td>
+                      <td
+                        className={`px-6 py-4 align-top text-sm font-mono text-right ${
+                          rincianIndex === 0 && spmIndex > 0
+                            ? 'border-t-2 border-slate-300'
+                            : ''
+                        }`}
+                      >
+                        {formatCurrency(rincian.jumlah)}
+                      </td>
+                      <td
+                        className={`px-6 py-4 align-top ${
+                          rincianIndex === 0 && spmIndex > 0
+                            ? 'border-t-2 border-slate-300'
+                            : ''
+                        }`}
+                      >
+                        <ProgressBar
+                          percentage={rincian.persentaseKelengkapan}
+                        />
+                      </td>
+                    </tr>
+                  ))
+                )
+              )}
             </tbody>
           </table>
         </div>
