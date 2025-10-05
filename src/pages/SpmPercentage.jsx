@@ -2,11 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import apiClient from '../api';
 import { useAuth } from '../contexts/AuthContext';
-import { useSatker } from '../contexts/SatkerContext'; // Import useSatker
+import { useSatker } from '../contexts/SatkerContext';
 import ProgressBar from '../components/ProgressBar';
 import StatusBadge from '../components/StatusBadge';
 
-// Helper functions (tidak berubah)
 const formatDate = (dateString) =>
   new Date(dateString).toLocaleDateString('id-ID', {
     day: 'numeric',
@@ -18,19 +17,13 @@ const formatCurrency = (number) =>
     style: 'currency',
     currency: 'IDR',
     minimumFractionDigits: 0,
-  }).format(number);
+  }).format(number || 0);
 
 function SpmPercentage() {
   const { user } = useAuth();
   const { selectedSatkerId, tahunAnggaran, isContextSet } = useSatker();
 
-  const {
-    data: spms,
-    isLoading,
-    isError,
-    error,
-  } = useQuery({
-    // Query key sekarang menyertakan konteks agar data di-refetch saat konteks berubah
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: [
       'spmsCompleteness',
       { satker: selectedSatkerId, tahun: tahunAnggaran },
@@ -41,9 +34,10 @@ function SpmPercentage() {
           params: { satkerId: selectedSatkerId, tahun: tahunAnggaran },
         })
         .then((res) => res.data),
-    // Hanya jalankan query jika konteks sudah diatur
     enabled: isContextSet,
   });
+
+  const spms = data?.spms;
 
   return (
     <div className="space-y-6">
@@ -110,7 +104,7 @@ function SpmPercentage() {
                     </td>
                   </tr>
                 ) : (
-                  spms?.map((spm) => (
+                  spms.map((spm) => (
                     <tr key={spm.id} className="hover:bg-slate-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
                         {spm.nomorSpm}

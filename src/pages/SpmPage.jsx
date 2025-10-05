@@ -6,7 +6,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSatker } from '../contexts/SatkerContext';
 import StatusBadge from '../components/StatusBadge';
 import Modal from '../components/Modal';
-import { Plus, Edit, Trash2, Link as LinkIcon } from 'lucide-react'; // Add LinkIcon
+import Pagination from '../components/Pagination';
+import { Plus, Edit, Trash2, Link as LinkIcon } from 'lucide-react';
 
 const formatDate = (dateString) =>
   new Date(dateString).toLocaleDateString('id-ID', {
@@ -27,21 +28,31 @@ function SpmPage() {
   const { selectedSatkerId, tahunAnggaran, isContextSet } = useSatker();
   const [spmToDelete, setSpmToDelete] = useState(null);
 
-  const {
-    data: spms,
-    isLoading,
-    isError,
-    error,
-  } = useQuery({
-    queryKey: ['spms', { satker: selectedSatkerId, tahun: tahunAnggaran }],
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: [
+      'spms',
+      { satker: selectedSatkerId, tahun: tahunAnggaran, page: currentPage },
+    ],
     queryFn: async () =>
       apiClient
         .get('/spm', {
-          params: { satkerId: selectedSatkerId, tahun: tahunAnggaran },
+          params: {
+            satkerId: selectedSatkerId,
+            tahun: tahunAnggaran,
+            page: currentPage,
+            limit: itemsPerPage,
+          },
         })
         .then((res) => res.data),
     enabled: isContextSet,
+    placeholderData: (previousData) => previousData,
   });
+
+  const spms = data?.spms;
+  const totalPages = data?.totalPages;
 
   const deleteSpmMutation = useMutation({
     mutationFn: (spmId) => apiClient.delete(`/spm/${spmId}`),
@@ -49,10 +60,12 @@ function SpmPage() {
       queryClient.invalidateQueries({ queryKey: ['spms'] });
       setSpmToDelete(null);
     },
-    onError: (error) =>
+    onError: (error) => {
       alert(
         `Gagal menghapus SPM: ${error.response?.data?.error || error.message}`
-      ),
+      );
+      setSpmToDelete(null);
+    },
   });
 
   const openDeleteModal = (spm) => setSpmToDelete(spm);
@@ -108,135 +121,144 @@ function SpmPage() {
             <p className="text-center text-gray-500 py-10">
               Silakan atur konteks di Dashboard untuk melihat data SPM.
             </p>
-          ) : isLoading ? (
+          ) : isLoading && !data ? ( // Show loading only on initial fetch
             <p className="text-center text-gray-500 py-10">Memuat data...</p>
           ) : isError ? (
             <p className="text-center text-red-500 py-10">
               Error: {error.message}
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Nomor SPM
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Tanggal
-                    </th>
-                    {user?.role !== 'op_satker' && (
+            <>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
                       <th
                         scope="col"
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
-                        Satker
+                        Nomor SPM
                       </th>
-                    )}
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Total Anggaran
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Jml. Rincian
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Status
-                    </th>
-                    <th scope="col" className="relative px-6 py-3">
-                      <span className="sr-only">Aksi</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {spms.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={user?.role !== 'op_satker' ? 7 : 6}
-                        className="text-center py-8 text-gray-500"
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
-                        Tidak ada data SPM yang ditemukan untuk konteks ini.
-                      </td>
+                        Tanggal
+                      </th>
+                      {user?.role !== 'op_satker' && (
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Satker
+                        </th>
+                      )}
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        Total Anggaran
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        Jml. Rincian
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        Status
+                      </th>
+                      <th scope="col" className="relative px-6 py-3">
+                        <span className="sr-only">Aksi</span>
+                      </th>
                     </tr>
-                  ) : (
-                    spms.map((spm) => (
-                      <tr
-                        key={spm.id}
-                        className="hover:bg-gray-50 transition-colors"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          <div className="flex items-center gap-2">
-                            {spm.driveLink && (
-                              <a
-                                href={spm.driveLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title="Buka tautan G-Drive"
-                                className="text-blue-500 hover:text-blue-700"
-                              >
-                                <LinkIcon className="w-4 h-4" />
-                              </a>
-                            )}
-                            <span>{spm.nomorSpm}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {formatDate(spm.tanggal)}
-                        </td>
-                        {user?.role !== 'op_satker' && (
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            {spm.satker?.nama || 'N/A'}
-                          </td>
-                        )}
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono text-right">
-                          {formatCurrency(spm.totalAnggaran)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 text-center">
-                          {spm._count?.rincian || 0}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <StatusBadge status={spm.status} />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-4">
-                          <Link
-                            to={`/spm/${spm.id}/edit`}
-                            className="inline-flex items-center gap-1.5 text-bpsBlue-dark hover:text-bpsBlue-light font-semibold"
-                          >
-                            <Edit size={14} /> <span>Detail</span>
-                          </Link>
-                          {['MENUNGGU', 'DITOLAK'].includes(spm.status) && (
-                            <button
-                              onClick={() => openDeleteModal(spm)}
-                              disabled={deleteSpmMutation.isPending}
-                              className="inline-flex items-center gap-1.5 text-danger hover:text-danger-dark disabled:opacity-50 font-semibold"
-                            >
-                              <Trash2 size={14} /> <span>Hapus</span>
-                            </button>
-                          )}
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {spms?.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={user?.role !== 'op_satker' ? 7 : 6}
+                          className="text-center py-8 text-gray-500"
+                        >
+                          Tidak ada data SPM yang ditemukan untuk konteks ini.
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    ) : (
+                      spms.map((spm) => (
+                        <tr
+                          key={spm.id}
+                          className="hover:bg-gray-50 transition-colors"
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <div className="flex items-center gap-2">
+                              {spm.driveLink && (
+                                <a
+                                  href={spm.driveLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="Buka tautan G-Drive"
+                                  className="text-blue-500 hover:text-blue-700"
+                                >
+                                  <LinkIcon className="w-4 h-4" />
+                                </a>
+                              )}
+                              <span>{spm.nomorSpm}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {formatDate(spm.tanggal)}
+                          </td>
+                          {user?.role !== 'op_satker' && (
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                              {spm.satker?.nama || 'N/A'}
+                            </td>
+                          )}
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono text-right">
+                            {formatCurrency(spm.totalAnggaran)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 text-center">
+                            {spm._count?.rincian || 0}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <StatusBadge status={spm.status} />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-4">
+                            <Link
+                              to={`/spm/${spm.id}/edit`}
+                              className="inline-flex items-center gap-1.5 text-bpsBlue-dark hover:text-bpsBlue-light font-semibold"
+                            >
+                              <Edit size={14} /> <span>Detail</span>
+                            </Link>
+                            {['MENUNGGU', 'DITOLAK'].includes(spm.status) && (
+                              <button
+                                onClick={() => openDeleteModal(spm)}
+                                disabled={deleteSpmMutation.isPending}
+                                className="inline-flex items-center gap-1.5 text-danger hover:text-danger-dark disabled:opacity-50 font-semibold"
+                              >
+                                <Trash2 size={14} /> <span>Hapus</span>
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={(page) => setCurrentPage(page)}
+              />
+            </>
           )}
         </div>
       </div>
+
       <Modal
         isOpen={!!spmToDelete}
         onClose={() => setSpmToDelete(null)}

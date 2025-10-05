@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
-// Statistic Card Component
+// Komponen Kartu Statistik (No changes needed)
 function SummaryCard({ icon, title, value, colorClass }) {
   return (
     <div
@@ -37,20 +37,16 @@ function SummaryCard({ icon, title, value, colorClass }) {
   );
 }
 
-// Context/Filter Controls Component
-function ContextControls() {
+// Komponen untuk Kontrol Konteks/Filter
+function ContextControls({ isContextSet, setIsContextSet }) {
   const { user } = useAuth();
-  // --- GET isContextSet FROM THE GLOBAL CONTEXT ---
   const {
     selectedSatkerId,
     setSelectedSatkerId,
     tahunAnggaran,
     setTahunAnggaran,
-    isContextSet,
-    setIsContextSet,
   } = useSatker();
 
-  // Local draft state remains
   const [draftTahun, setDraftTahun] = useState(tahunAnggaran);
   const [draftSatker, setDraftSatker] = useState(selectedSatkerId || '');
 
@@ -64,7 +60,6 @@ function ContextControls() {
     setDraftTahun(tahunAnggaran);
   }, [selectedSatkerId, tahunAnggaran]);
 
-  // This function now controls the global state
   const handleToggleContext = () => {
     if (isContextSet) {
       setIsContextSet(false);
@@ -86,7 +81,6 @@ function ContextControls() {
         </h2>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-        {/* Satuan Kerja Column */}
         <div className="w-full">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Satuan Kerja
@@ -109,7 +103,6 @@ function ContextControls() {
             ))}
           </select>
         </div>
-        {/* Tahun Anggaran Column */}
         <div className="w-full">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Tahun Anggaran
@@ -125,7 +118,6 @@ function ContextControls() {
             <option value="2023">2023</option>
           </select>
         </div>
-        {/* Apply/Change Button */}
         <div className="w-full">
           <button
             onClick={handleToggleContext}
@@ -143,18 +135,21 @@ function ContextControls() {
 
 function DashboardPage() {
   const { user } = useAuth();
-  // --- REMOVE LOCAL STATE, USE THE ONE FROM CONTEXT ---
-  const { selectedSatkerId, tahunAnggaran, isContextSet } = useSatker();
+  const { selectedSatkerId, tahunAnggaran, isContextSet, setIsContextSet } =
+    useSatker();
 
-  // The query logic remains unchanged, still dependent on `isContextSet`
   const {
-    data: spms,
+    data, // Get the entire response object as 'data'
     isLoading,
     isError,
     error,
   } = useQuery({
-    queryKey: ['spms', { satker: selectedSatkerId, tahun: tahunAnggaran }],
+    queryKey: [
+      'spmsDashboard',
+      { satker: selectedSatkerId, tahun: tahunAnggaran },
+    ],
     queryFn: async () => {
+      // For dashboard stats, we fetch ALL SPMs, so pagination params are removed.
       const res = await apiClient.get('/spm', {
         params: { satkerId: selectedSatkerId, tahun: tahunAnggaran },
       });
@@ -163,13 +158,17 @@ function DashboardPage() {
     enabled: isContextSet,
   });
 
+  // Extract the 'spms' array from the response object
+  const spms = data?.spms;
+
   const { data: satkerList } = useQuery({
     queryKey: ['satkers'],
     queryFn: () => apiClient.get('/satker').then((res) => res.data),
   });
 
+  // The stats calculation will now work correctly on the 'spms' array
   const stats = {
-    total: spms?.length || 0,
+    total: data?.totalCount || 0, // Use totalCount from API for accuracy
     diterima: spms?.filter((spm) => spm.status === 'DITERIMA').length || 0,
     ditolak: spms?.filter((spm) => spm.status === 'DITOLAK').length || 0,
     menunggu: spms?.filter((spm) => spm.status === 'MENUNGGU').length || 0,
@@ -190,7 +189,7 @@ function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Welcome Header */}
+      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-800">
           Selamat Datang, {user?.name}!
@@ -201,13 +200,16 @@ function DashboardPage() {
         </p>
       </div>
 
-      {/* Context/Filter Controls */}
-      <ContextControls />
+      {/* Context Controls */}
+      <ContextControls
+        isContextSet={isContextSet}
+        setIsContextSet={setIsContextSet}
+      />
 
-      {/* Conditional Main Content Rendering */}
+      {/* Conditional Content */}
       {isContextSet ? (
         <>
-          {/* Active Context Indicators */}
+          {/* Active Context Indicator */}
           <div className="border-t border-gray-200 pt-8">
             <div className="flex items-center gap-4 text-gray-600">
               <div className="flex items-center gap-2">
@@ -236,7 +238,7 @@ function DashboardPage() {
             </div>
           )}
 
-          {/* Statistics and Chart Content */}
+          {/* Data and Chart Content */}
           {!isLoading && !isError && (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -309,7 +311,6 @@ function DashboardPage() {
           )}
         </>
       ) : (
-        // Message to show when context is not set
         <div className="border-t border-dashed border-gray-300 pt-8 text-center text-gray-500">
           <p>
             Silakan <strong>terapkan konteks</strong> di atas untuk menampilkan
