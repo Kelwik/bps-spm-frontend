@@ -26,7 +26,6 @@ function ValidationPage() {
     mutate: validateReport,
     isPending,
     data: validationResult,
-    error,
   } = useMutation({
     mutationFn: (parsedData) =>
       apiClient.post('/spm/validate-report', parsedData),

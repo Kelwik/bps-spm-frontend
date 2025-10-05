@@ -30,7 +30,7 @@ function App() {
           <Route path="/spm" element={<SpmPage />} />
           <Route path="/rincian" element={<SpmDetailPage />} />
           <Route path="/laporanspm" element={<SpmPercentage />} />
-          <Route path="/flags" element={<ValidationPage />} />
+          <Route path="/flags" element={<FlagManagementPage />} />
           <Route path="/performa" element={<SatkerPerformancePage />} />
           <Route path="/sakti" element={<ValidationPage />} />
 
