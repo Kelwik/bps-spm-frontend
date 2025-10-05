@@ -1,5 +1,7 @@
-import { NavLink, Outlet } from 'react-router';
+import { NavLink, Outlet, useLocation } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
+import { useSatker } from '../contexts/SatkerContext'; // Import useSatker
+import DashboardPage from '../pages/DashboardPage'; // Import DashboardPage to render it when locked
 import {
   BarChart3,
   FileText,
@@ -7,11 +9,16 @@ import {
   LogOut,
   ChevronDown,
   BookCopy,
+  Users,
+  Tags,
 } from 'lucide-react';
-import bpsLogo from '../../src/assets/logobps.png';
+import bpsLogo from '../assets/logobps.png';
 
 function Layout() {
   const { user, logout } = useAuth();
+  // --- 1. GET THE CONTEXT STATUS FROM THE GLOBAL STATE ---
+  const { isContextSet } = useSatker();
+  const location = useLocation();
 
   const navLinkBaseStyle =
     'flex h-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-blue-100 hover:text-white hover:bg-white/10 transition-all duration-200';
@@ -54,8 +61,6 @@ function Layout() {
               <span className="hidden lg:inline">Daftar SPM</span>
             </NavLink>
 
-            {/* --- PERBAIKAN DI SINI --- */}
-            {/* 1. Tambahkan padding vertikal (py-2) ke 'group' untuk memperluas area hover */}
             <div className="relative group h-full flex items-center py-2">
               <div className={`${navLinkBaseStyle} cursor-pointer`}>
                 <BarChart3 size={16} />
@@ -65,7 +70,6 @@ function Layout() {
                   className="transition-transform duration-200 group-hover:rotate-180"
                 />
               </div>
-              {/* 2. Hapus margin-top (mt-2) agar tidak ada celah antara tombol dan menu */}
               <div className="absolute top-full right-0 bg-white rounded-md shadow-lg w-60 z-20 hidden group-hover:block p-2">
                 <NavLink
                   to="/laporanspm"
@@ -85,8 +89,33 @@ function Layout() {
                   <BookCopy size={16} className="text-bpsBlue-light" />
                   <span>Laporan Semua Rincian</span>
                 </NavLink>
+                {['op_prov', 'supervisor'].includes(user?.role) && (
+                  <>
+                    <NavLink
+                      to="/performa"
+                      className={({ isActive }) =>
+                        `${dropdownLinkStyle} ${isActive ? 'bg-blue-50' : ''}`
+                      }
+                    >
+                      <Users size={16} className="text-bpsBlue-light" />
+                      <span>Performa Satker</span>
+                    </NavLink>
+                  </>
+                )}
               </div>
             </div>
+
+            {['op_prov', 'supervisor'].includes(user?.role) && (
+              <NavLink
+                to="/flags"
+                className={({ isActive }) =>
+                  `${navLinkBaseStyle} ${isActive ? activeLinkStyle : ''}`
+                }
+              >
+                <Tags size={16} />
+                <span className="hidden lg:inline">Checklist</span>
+              </NavLink>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
@@ -110,7 +139,15 @@ function Layout() {
       </nav>
 
       <main className="w-full max-w-7xl mx-auto py-8 px-6">
-        <Outlet />
+        {/* --- 2. THE GATEKEEPER LOGIC --- */}
+        {/* If context is set, show the requested page (Outlet). */}
+        {/* If not, force the DashboardPage to be displayed so the user can set the context. */}
+        {/* We also make an exception for the dashboard page itself. */}
+        {isContextSet || location.pathname === '/' ? (
+          <Outlet />
+        ) : (
+          <DashboardPage />
+        )}
       </main>
     </div>
   );

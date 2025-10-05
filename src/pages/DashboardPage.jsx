@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
-// Komponen Kartu Statistik
+// Statistic Card Component
 function SummaryCard({ icon, title, value, colorClass }) {
   return (
     <div
@@ -37,16 +37,20 @@ function SummaryCard({ icon, title, value, colorClass }) {
   );
 }
 
-// Komponen untuk Kontrol Konteks/Filter
-function ContextControls({ isContextSet, setIsContextSet }) {
+// Context/Filter Controls Component
+function ContextControls() {
   const { user } = useAuth();
+  // --- GET isContextSet FROM THE GLOBAL CONTEXT ---
   const {
     selectedSatkerId,
     setSelectedSatkerId,
     tahunAnggaran,
     setTahunAnggaran,
+    isContextSet,
+    setIsContextSet,
   } = useSatker();
 
+  // Local draft state remains
   const [draftTahun, setDraftTahun] = useState(tahunAnggaran);
   const [draftSatker, setDraftSatker] = useState(selectedSatkerId || '');
 
@@ -60,13 +64,11 @@ function ContextControls({ isContextSet, setIsContextSet }) {
     setDraftTahun(tahunAnggaran);
   }, [selectedSatkerId, tahunAnggaran]);
 
+  // This function now controls the global state
   const handleToggleContext = () => {
     if (isContextSet) {
-      // Jika konteks sudah di-set (mode "Ubah"), maka buka kuncinya
       setIsContextSet(false);
     } else {
-      // Jika konteks belum di-set (mode "Terapkan"), set konteks global
-      // dan kunci inputnya
       if (user.role !== 'op_satker') {
         setSelectedSatkerId(draftSatker ? parseInt(draftSatker) : null);
       }
@@ -84,7 +86,7 @@ function ContextControls({ isContextSet, setIsContextSet }) {
         </h2>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-        {/* Kolom Satuan Kerja */}
+        {/* Satuan Kerja Column */}
         <div className="w-full">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Satuan Kerja
@@ -107,7 +109,7 @@ function ContextControls({ isContextSet, setIsContextSet }) {
             ))}
           </select>
         </div>
-        {/* Kolom Tahun Anggaran */}
+        {/* Tahun Anggaran Column */}
         <div className="w-full">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Tahun Anggaran
@@ -123,7 +125,7 @@ function ContextControls({ isContextSet, setIsContextSet }) {
             <option value="2023">2023</option>
           </select>
         </div>
-        {/* Tombol Terapkan/Ubah */}
+        {/* Apply/Change Button */}
         <div className="w-full">
           <button
             onClick={handleToggleContext}
@@ -141,12 +143,10 @@ function ContextControls({ isContextSet, setIsContextSet }) {
 
 function DashboardPage() {
   const { user } = useAuth();
-  const { selectedSatkerId, tahunAnggaran } = useSatker();
+  // --- REMOVE LOCAL STATE, USE THE ONE FROM CONTEXT ---
+  const { selectedSatkerId, tahunAnggaran, isContextSet } = useSatker();
 
-  // State untuk mengontrol apakah konteks sudah di-set oleh user
-  const [isContextSet, setIsContextSet] = useState(false);
-
-  // Query untuk mengambil data SPM, HANYA akan berjalan jika isContextSet bernilai true
+  // The query logic remains unchanged, still dependent on `isContextSet`
   const {
     data: spms,
     isLoading,
@@ -160,16 +160,14 @@ function DashboardPage() {
       });
       return res.data;
     },
-    enabled: isContextSet, // <-- KUNCI UTAMA: API call tidak berjalan sebelum konteks diterapkan
+    enabled: isContextSet,
   });
 
-  // Query untuk mendapatkan daftar satker (untuk menampilkan nama)
   const { data: satkerList } = useQuery({
     queryKey: ['satkers'],
     queryFn: () => apiClient.get('/satker').then((res) => res.data),
   });
 
-  // Kalkulasi statistik berdasarkan data SPM yang sudah di-fetch
   const stats = {
     total: spms?.length || 0,
     diterima: spms?.filter((spm) => spm.status === 'DITERIMA').length || 0,
@@ -177,14 +175,12 @@ function DashboardPage() {
     menunggu: spms?.filter((spm) => spm.status === 'MENUNGGU').length || 0,
   };
 
-  // Data untuk ditampilkan di chart
   const chartData = [
     { name: 'Menunggu', total: stats.menunggu, color: '#f59e0b' },
     { name: 'Ditolak', total: stats.ditolak, color: '#ef4444' },
     { name: 'Diterima', total: stats.diterima, color: '#22c55e' },
   ];
 
-  // Menentukan nama satker yang sedang aktif untuk ditampilkan
   const currentSatkerName =
     user?.role === 'op_satker'
       ? satkerList?.find((s) => s.id === user.satkerId)?.nama
@@ -194,7 +190,7 @@ function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header Sambutan */}
+      {/* Welcome Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-800">
           Selamat Datang, {user?.name}!
@@ -205,16 +201,13 @@ function DashboardPage() {
         </p>
       </div>
 
-      {/* Kontrol Konteks/Filter */}
-      <ContextControls
-        isContextSet={isContextSet}
-        setIsContextSet={setIsContextSet}
-      />
+      {/* Context/Filter Controls */}
+      <ContextControls />
 
-      {/* Render konten utama secara kondisional */}
+      {/* Conditional Main Content Rendering */}
       {isContextSet ? (
         <>
-          {/* Indikator Konteks Aktif */}
+          {/* Active Context Indicators */}
           <div className="border-t border-gray-200 pt-8">
             <div className="flex items-center gap-4 text-gray-600">
               <div className="flex items-center gap-2">
@@ -243,7 +236,7 @@ function DashboardPage() {
             </div>
           )}
 
-          {/* Konten Data Statistik dan Chart */}
+          {/* Statistics and Chart Content */}
           {!isLoading && !isError && (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -316,7 +309,7 @@ function DashboardPage() {
           )}
         </>
       ) : (
-        // Tampilkan pesan ini jika konteks belum di-set
+        // Message to show when context is not set
         <div className="border-t border-dashed border-gray-300 pt-8 text-center text-gray-500">
           <p>
             Silakan <strong>terapkan konteks</strong> di atas untuk menampilkan
