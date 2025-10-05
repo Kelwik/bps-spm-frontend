@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useLocation } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
-import { useSatker } from '../contexts/SatkerContext'; // Import useSatker
-import DashboardPage from '../pages/DashboardPage'; // Import DashboardPage to render it when locked
+import { useSatker } from '../contexts/SatkerContext';
+import DashboardPage from '../pages/DashboardPage';
 import {
   BarChart3,
   FileText,
@@ -11,12 +11,12 @@ import {
   BookCopy,
   Users,
   Tags,
+  ShieldCheck,
 } from 'lucide-react';
 import bpsLogo from '../assets/logobps.png';
 
 function Layout() {
   const { user, logout } = useAuth();
-  // --- 1. GET THE CONTEXT STATUS FROM THE GLOBAL STATE ---
   const { isContextSet } = useSatker();
   const location = useLocation();
 
@@ -40,7 +40,7 @@ function Layout() {
             </div>
           </NavLink>
 
-          <div className="flex items-center gap-4 h-full">
+          <div className="flex items-center gap-2 h-full">
             <NavLink
               to="/"
               end
@@ -61,6 +61,7 @@ function Layout() {
               <span className="hidden lg:inline">Daftar SPM</span>
             </NavLink>
 
+            {/* Reports Dropdown */}
             <div className="relative group h-full flex items-center py-2">
               <div className={`${navLinkBaseStyle} cursor-pointer`}>
                 <BarChart3 size={16} />
@@ -78,7 +79,7 @@ function Layout() {
                   }
                 >
                   <FileText size={16} className="text-bpsBlue-light" />
-                  <span>Laporan Kelengkapan SPM</span>
+                  <span>Laporan Kelengkapan</span>
                 </NavLink>
                 <NavLink
                   to="/rincian"
@@ -87,34 +88,63 @@ function Layout() {
                   }
                 >
                   <BookCopy size={16} className="text-bpsBlue-light" />
-                  <span>Laporan Semua Rincian</span>
+                  <span>Laporan Rincian</span>
                 </NavLink>
                 {['op_prov', 'supervisor'].includes(user?.role) && (
-                  <>
-                    <NavLink
-                      to="/performa"
-                      className={({ isActive }) =>
-                        `${dropdownLinkStyle} ${isActive ? 'bg-blue-50' : ''}`
-                      }
-                    >
-                      <Users size={16} className="text-bpsBlue-light" />
-                      <span>Performa Satker</span>
-                    </NavLink>
-                  </>
+                  <NavLink
+                    to="/performa"
+                    className={({ isActive }) =>
+                      `${dropdownLinkStyle} ${isActive ? 'bg-blue-50' : ''}`
+                    }
+                  >
+                    <Users size={16} className="text-bpsBlue-light" />
+                    <span>Performa Satker</span>
+                  </NavLink>
                 )}
               </div>
             </div>
 
+            {/* Admin/Settings Dropdown */}
             {['op_prov', 'supervisor'].includes(user?.role) && (
-              <NavLink
-                to="/flags"
-                className={({ isActive }) =>
-                  `${navLinkBaseStyle} ${isActive ? activeLinkStyle : ''}`
-                }
-              >
-                <Tags size={16} />
-                <span className="hidden lg:inline">Checklist</span>
-              </NavLink>
+              <div className="relative group h-full flex items-center py-2">
+                <div className={`${navLinkBaseStyle} cursor-pointer`}>
+                  <Tags size={16} />
+                  <span className="hidden lg:inline">Settings</span>
+                  <ChevronDown
+                    size={14}
+                    className="transition-transform duration-200 group-hover:rotate-180"
+                  />
+                </div>
+                <div className="absolute top-full right-0 bg-white rounded-md shadow-lg w-60 z-20 hidden group-hover:block p-2">
+                  <NavLink
+                    to="/flags"
+                    className={({ isActive }) =>
+                      `${dropdownLinkStyle} ${isActive ? 'bg-blue-50' : ''}`
+                    }
+                  >
+                    <Tags size={16} className="text-bpsBlue-light" />
+                    <span>Manajemen Checklist</span>
+                  </NavLink>
+                  <NavLink
+                    to="/users"
+                    className={({ isActive }) =>
+                      `${dropdownLinkStyle} ${isActive ? 'bg-blue-50' : ''}`
+                    }
+                  >
+                    <Users size={16} className="text-bpsBlue-light" />
+                    <span>Manajemen Pengguna</span>
+                  </NavLink>
+                  <NavLink
+                    to="/validasi"
+                    className={({ isActive }) =>
+                      `${dropdownLinkStyle} ${isActive ? 'bg-blue-50' : ''}`
+                    }
+                  >
+                    <ShieldCheck size={16} className="text-bpsBlue-light" />
+                    <span>Validasi SAKTI</span>
+                  </NavLink>
+                </div>
+              </div>
             )}
           </div>
 
@@ -139,10 +169,6 @@ function Layout() {
       </nav>
 
       <main className="w-full max-w-7xl mx-auto py-8 px-6">
-        {/* --- 2. THE GATEKEEPER LOGIC --- */}
-        {/* If context is set, show the requested page (Outlet). */}
-        {/* If not, force the DashboardPage to be displayed so the user can set the context. */}
-        {/* We also make an exception for the dashboard page itself. */}
         {isContextSet || location.pathname === '/' ? (
           <Outlet />
         ) : (

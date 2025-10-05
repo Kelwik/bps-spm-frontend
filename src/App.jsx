@@ -11,6 +11,7 @@ import SpmPercentage from './pages/SpmPercentage';
 import FlagManagementPage from './pages/FlagManagementPage';
 import SatkerPerformancePage from './pages/ReportPage';
 import ValidationPage from './pages/ValidationPage';
+import UserManagementPage from './pages/UserManagementPage';
 
 function App() {
   return (
@@ -32,8 +33,8 @@ function App() {
           <Route path="/laporanspm" element={<SpmPercentage />} />
           <Route path="/flags" element={<FlagManagementPage />} />
           <Route path="/performa" element={<SatkerPerformancePage />} />
-          <Route path="/sakti" element={<ValidationPage />} />
-
+          <Route path="/validasi" element={<ValidationPage />} />
+          <Route path="/users" element={<UserManagementPage />} />
           <Route path="/laporan" element={<LaporanPage />} />
           <Route path="spm/:id/edit" element={<SpmCreatePage isEditMode />} />
           <Route path="spm/baru" element={<SpmCreatePage />} />
