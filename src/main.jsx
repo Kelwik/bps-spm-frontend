@@ -10,6 +10,7 @@ const queryClient = new QueryClient();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
+    <title>SIKAP BPS</title>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <SatkerProvider>

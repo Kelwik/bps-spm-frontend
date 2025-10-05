@@ -38,7 +38,7 @@ function SummaryCard({ icon, title, value, colorClass }) {
 }
 
 // Komponen untuk Kontrol Konteks/Filter
-function ContextControls() {
+function ContextControls({ isContextSet, setIsContextSet }) {
   const { user } = useAuth();
   const {
     selectedSatkerId,
@@ -60,11 +60,19 @@ function ContextControls() {
     setDraftTahun(tahunAnggaran);
   }, [selectedSatkerId, tahunAnggaran]);
 
-  const handleApply = () => {
-    if (user.role !== 'op_satker') {
-      setSelectedSatkerId(draftSatker ? parseInt(draftSatker) : null);
+  const handleToggleContext = () => {
+    if (isContextSet) {
+      // Jika konteks sudah di-set (mode "Ubah"), maka buka kuncinya
+      setIsContextSet(false);
+    } else {
+      // Jika konteks belum di-set (mode "Terapkan"), set konteks global
+      // dan kunci inputnya
+      if (user.role !== 'op_satker') {
+        setSelectedSatkerId(draftSatker ? parseInt(draftSatker) : null);
+      }
+      setTahunAnggaran(draftTahun);
+      setIsContextSet(true);
     }
-    setTahunAnggaran(draftTahun);
   };
 
   return (
@@ -85,7 +93,9 @@ function ContextControls() {
             className="form-input"
             value={user.role === 'op_satker' ? user.satkerId : draftSatker}
             onChange={(e) => setDraftSatker(e.target.value)}
-            disabled={user.role === 'op_satker' || isLoadingSatkers}
+            disabled={
+              isContextSet || user.role === 'op_satker' || isLoadingSatkers
+            }
           >
             {user.role !== 'op_satker' && (
               <option value="">Semua Satker</option>
@@ -106,16 +116,22 @@ function ContextControls() {
             className="form-input"
             value={draftTahun}
             onChange={(e) => setDraftTahun(e.target.value)}
+            disabled={isContextSet}
           >
             <option value="2025">2025</option>
             <option value="2024">2024</option>
             <option value="2023">2023</option>
           </select>
         </div>
-        {/* Tombol Terapkan */}
+        {/* Tombol Terapkan/Ubah */}
         <div className="w-full">
-          <button onClick={handleApply} className="btn-primary w-full">
-            Terapkan Konteks
+          <button
+            onClick={handleToggleContext}
+            className={`w-full ${
+              isContextSet ? 'btn-secondary' : 'btn-primary'
+            }`}
+          >
+            {isContextSet ? 'Ubah Konteks' : 'Terapkan Konteks'}
           </button>
         </div>
       </div>
@@ -127,7 +143,10 @@ function DashboardPage() {
   const { user } = useAuth();
   const { selectedSatkerId, tahunAnggaran } = useSatker();
 
-  // Query untuk mengambil data SPM
+  // State untuk mengontrol apakah konteks sudah di-set oleh user
+  const [isContextSet, setIsContextSet] = useState(false);
+
+  // Query untuk mengambil data SPM, HANYA akan berjalan jika isContextSet bernilai true
   const {
     data: spms,
     isLoading,
@@ -141,14 +160,16 @@ function DashboardPage() {
       });
       return res.data;
     },
+    enabled: isContextSet, // <-- KUNCI UTAMA: API call tidak berjalan sebelum konteks diterapkan
   });
 
-  // Query terpisah untuk mendapatkan nama satker
+  // Query untuk mendapatkan daftar satker (untuk menampilkan nama)
   const { data: satkerList } = useQuery({
     queryKey: ['satkers'],
     queryFn: () => apiClient.get('/satker').then((res) => res.data),
   });
 
+  // Kalkulasi statistik berdasarkan data SPM yang sudah di-fetch
   const stats = {
     total: spms?.length || 0,
     diterima: spms?.filter((spm) => spm.status === 'DITERIMA').length || 0,
@@ -156,12 +177,14 @@ function DashboardPage() {
     menunggu: spms?.filter((spm) => spm.status === 'MENUNGGU').length || 0,
   };
 
+  // Data untuk ditampilkan di chart
   const chartData = [
     { name: 'Menunggu', total: stats.menunggu, color: '#f59e0b' },
     { name: 'Ditolak', total: stats.ditolak, color: '#ef4444' },
     { name: 'Diterima', total: stats.diterima, color: '#22c55e' },
   ];
 
+  // Menentukan nama satker yang sedang aktif untuk ditampilkan
   const currentSatkerName =
     user?.role === 'op_satker'
       ? satkerList?.find((s) => s.id === user.satkerId)?.nama
@@ -183,106 +206,123 @@ function DashboardPage() {
       </div>
 
       {/* Kontrol Konteks/Filter */}
-      <ContextControls />
+      <ContextControls
+        isContextSet={isContextSet}
+        setIsContextSet={setIsContextSet}
+      />
 
-      {/* --- INDIKATOR KONTEKS AKTIF --- */}
-      <div className="border-t border-gray-200 pt-8">
-        <div className="flex items-center gap-4 text-gray-600">
-          <div className="flex items-center gap-2">
-            <Building size={18} />
-            <span className="font-semibold">{currentSatkerName}</span>
-          </div>
-          <div className="border-l border-gray-300 h-6"></div>
-          <div className="flex items-center gap-2">
-            <CalendarDays size={18} />
-            <span className="font-semibold">
-              Tahun Anggaran: {tahunAnggaran}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Data Statistik */}
-      {isLoading && (
-        <div className="text-center text-gray-500 py-10">
-          Memuat data statistik...
-        </div>
-      )}
-      {isError && (
-        <div className="text-center text-red-500 py-10">
-          Error: {error.message}
-        </div>
-      )}
-
-      {!isLoading && !isError && (
+      {/* Render konten utama secara kondisional */}
+      {isContextSet ? (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <SummaryCard
-              icon={<FileSpreadsheet size={28} className="text-blue-500" />}
-              title="Total SPM"
-              value={stats.total}
-              colorClass="border-blue-500"
-            />
-            <SummaryCard
-              icon={<CheckCircle size={28} className="text-green-500" />}
-              title="Diterima"
-              value={stats.diterima}
-              colorClass="border-green-500"
-            />
-            <SummaryCard
-              icon={<XCircle size={28} className="text-red-500" />}
-              title="Ditolak"
-              value={stats.ditolak}
-              colorClass="border-red-500"
-            />
-            <SummaryCard
-              icon={<Clock size={28} className="text-yellow-500" />}
-              title="Menunggu"
-              value={stats.menunggu}
-              colorClass="border-yellow-500"
-            />
-          </div>
-
-          <div className="bg-white p-6 rounded-xl shadow-md">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">
-              Distribusi Status SPM
-            </h2>
-            <div style={{ width: '100%', height: 300 }}>
-              <ResponsiveContainer>
-                <BarChart
-                  data={chartData}
-                  margin={{ top: 5, right: 20, left: -10, bottom: 5 }}
-                >
-                  <XAxis
-                    dataKey="name"
-                    stroke="#6b7280"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    stroke="#6b7280"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <Tooltip
-                    cursor={{ fill: '#f3f4f6' }}
-                    contentStyle={{
-                      borderRadius: '0.5rem',
-                      border: '1px solid #e5e7eb',
-                    }}
-                  />
-                  <Bar dataKey="total" radius={[4, 4, 0, 0]}>
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+          {/* Indikator Konteks Aktif */}
+          <div className="border-t border-gray-200 pt-8">
+            <div className="flex items-center gap-4 text-gray-600">
+              <div className="flex items-center gap-2">
+                <Building size={18} />
+                <span className="font-semibold">{currentSatkerName}</span>
+              </div>
+              <div className="border-l border-gray-300 h-6"></div>
+              <div className="flex items-center gap-2">
+                <CalendarDays size={18} />
+                <span className="font-semibold">
+                  Tahun Anggaran: {tahunAnggaran}
+                </span>
+              </div>
             </div>
           </div>
+
+          {/* Loading and Error States */}
+          {isLoading && (
+            <div className="text-center text-gray-500 py-10">
+              Memuat data statistik...
+            </div>
+          )}
+          {isError && (
+            <div className="text-center text-red-500 py-10">
+              Error: {error.message}
+            </div>
+          )}
+
+          {/* Konten Data Statistik dan Chart */}
+          {!isLoading && !isError && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <SummaryCard
+                  icon={<FileSpreadsheet size={28} className="text-blue-500" />}
+                  title="Total SPM"
+                  value={stats.total}
+                  colorClass="border-blue-500"
+                />
+                <SummaryCard
+                  icon={<CheckCircle size={28} className="text-green-500" />}
+                  title="Diterima"
+                  value={stats.diterima}
+                  colorClass="border-green-500"
+                />
+                <SummaryCard
+                  icon={<XCircle size={28} className="text-red-500" />}
+                  title="Ditolak"
+                  value={stats.ditolak}
+                  colorClass="border-red-500"
+                />
+                <SummaryCard
+                  icon={<Clock size={28} className="text-yellow-500" />}
+                  title="Menunggu"
+                  value={stats.menunggu}
+                  colorClass="border-yellow-500"
+                />
+              </div>
+
+              <div className="bg-white p-6 rounded-xl shadow-md">
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">
+                  Distribusi Status SPM
+                </h2>
+                <div style={{ width: '100%', height: 300 }}>
+                  <ResponsiveContainer>
+                    <BarChart
+                      data={chartData}
+                      margin={{ top: 5, right: 20, left: -10, bottom: 5 }}
+                    >
+                      <XAxis
+                        dataKey="name"
+                        stroke="#6b7280"
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        stroke="#6b7280"
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <Tooltip
+                        cursor={{ fill: '#f3f4f6' }}
+                        contentStyle={{
+                          borderRadius: '0.5rem',
+                          border: '1px solid #e5e7eb',
+                        }}
+                      />
+                      <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </>
+          )}
         </>
+      ) : (
+        // Tampilkan pesan ini jika konteks belum di-set
+        <div className="border-t border-dashed border-gray-300 pt-8 text-center text-gray-500">
+          <p>
+            Silakan <strong>terapkan konteks</strong> di atas untuk menampilkan
+            data.
+          </p>
+        </div>
       )}
     </div>
   );
