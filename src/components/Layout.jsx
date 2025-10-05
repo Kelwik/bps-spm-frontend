@@ -12,6 +12,7 @@ import {
   Users,
   Tags,
   ShieldCheck,
+  Settings,
 } from 'lucide-react';
 import bpsLogo from '../assets/logobps.png';
 
@@ -108,7 +109,7 @@ function Layout() {
             {['op_prov', 'supervisor'].includes(user?.role) && (
               <div className="relative group h-full flex items-center py-2">
                 <div className={`${navLinkBaseStyle} cursor-pointer`}>
-                  <Tags size={16} />
+                  <Settings size={16} />
                   <span className="hidden lg:inline">Settings</span>
                   <ChevronDown
                     size={14}
