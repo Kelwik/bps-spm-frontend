@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import apiClient from '../api';
@@ -5,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSatker } from '../contexts/SatkerContext';
 import ProgressBar from '../components/ProgressBar';
 import StatusBadge from '../components/StatusBadge';
+import Pagination from '../components/Pagination'; // Import the Pagination component
 
 const formatDate = (dateString) =>
   new Date(dateString).toLocaleDateString('id-ID', {
@@ -23,21 +25,38 @@ function SpmPercentage() {
   const { user } = useAuth();
   const { selectedSatkerId, tahunAnggaran, isContextSet } = useSatker();
 
-  const { data, isLoading, isError, error } = useQuery({
+  // State for pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const {
+    data, // API now returns an object { spms, totalPages, ... }
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
     queryKey: [
       'spmsCompleteness',
-      { satker: selectedSatkerId, tahun: tahunAnggaran },
+      { satker: selectedSatkerId, tahun: tahunAnggaran, page: currentPage },
     ],
     queryFn: async () =>
       apiClient
         .get('/spm', {
-          params: { satkerId: selectedSatkerId, tahun: tahunAnggaran },
+          params: {
+            satkerId: selectedSatkerId,
+            tahun: tahunAnggaran,
+            page: currentPage,
+            limit: itemsPerPage,
+          },
         })
         .then((res) => res.data),
     enabled: isContextSet,
+    placeholderData: (previousData) => previousData, // Keep old data visible while new page is fetching
   });
 
+  // Extract the SPM list and pagination info from the data object
   const spms = data?.spms;
+  const totalPages = data?.totalPages;
 
   return (
     <div className="space-y-6">
@@ -55,7 +74,7 @@ function SpmPercentage() {
           <p className="text-center text-slate-500 py-10">
             Silakan atur konteks di Dashboard untuk melihat laporan.
           </p>
-        ) : isLoading ? (
+        ) : isLoading && !data ? (
           <p className="text-center text-slate-500 py-10">
             Memuat data laporan...
           </p>
@@ -64,82 +83,93 @@ function SpmPercentage() {
             Error: {error.message}
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Nomor SPM
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Tanggal
-                  </th>
-                  {user?.role !== 'op_satker' && (
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                      Satker
-                    </th>
-                  )}
-                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Total Anggaran
-                  </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="w-56 px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Kelengkapan Dokumen
-                  </th>
-                  <th className="relative px-6 py-3">
-                    <span className="sr-only">Detail</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-slate-200">
-                {spms?.length === 0 ? (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50">
                   <tr>
-                    <td
-                      colSpan={user?.role !== 'op_satker' ? 7 : 6}
-                      className="text-center py-8 text-slate-500"
-                    >
-                      Tidak ada data SPM untuk ditampilkan pada konteks ini.
-                    </td>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Nomor SPM
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Tanggal
+                    </th>
+                    {user?.role !== 'op_satker' && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        Satker
+                      </th>
+                    )}
+                    <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Total Anggaran
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="w-56 px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Kelengkapan Dokumen
+                    </th>
+                    <th className="relative px-6 py-3">
+                      <span className="sr-only">Detail</span>
+                    </th>
                   </tr>
-                ) : (
-                  spms.map((spm) => (
-                    <tr key={spm.id} className="hover:bg-slate-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
-                        {spm.nomorSpm}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                        {formatDate(spm.tanggal)}
-                      </td>
-                      {user?.role !== 'op_satker' && (
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                          {spm.satker?.nama || 'N/A'}
-                        </td>
-                      )}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-mono text-right">
-                        {formatCurrency(spm.totalAnggaran)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <StatusBadge status={spm.status} />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <ProgressBar percentage={spm.completenessPercentage} />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link
-                          to={`/spm/${spm.id}/edit`}
-                          className="text-indigo-600 hover:text-indigo-900"
-                        >
-                          Lihat Detail
-                        </Link>
+                </thead>
+                <tbody className="bg-white divide-y divide-slate-200">
+                  {spms?.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={user?.role !== 'op_satker' ? 7 : 6}
+                        className="text-center py-8 text-slate-500"
+                      >
+                        Tidak ada data SPM untuk ditampilkan pada konteks ini.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : (
+                    spms.map((spm) => (
+                      <tr key={spm.id} className="hover:bg-slate-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
+                          {spm.nomorSpm}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                          {formatDate(spm.tanggal)}
+                        </td>
+                        {user?.role !== 'op_satker' && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                            {spm.satker?.nama || 'N/A'}
+                          </td>
+                        )}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-mono text-right">
+                          {formatCurrency(spm.totalAnggaran)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <StatusBadge status={spm.status} />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <ProgressBar
+                            percentage={spm.completenessPercentage}
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <Link
+                            to={`/spm/${spm.id}/edit`}
+                            className="text-indigo-600 hover:text-indigo-900"
+                          >
+                            Lihat Detail
+                          </Link>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="p-4 border-t">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={(page) => setCurrentPage(page)}
+              />
+            </div>
+          </>
         )}
       </div>
     </div>
