@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router'; // Path diperbaiki
+import { Link } from 'react-router';
 import apiClient from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { useSatker } from '../contexts/SatkerContext';
 import StatusBadge from '../components/StatusBadge';
 import Modal from '../components/Modal';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Link as LinkIcon } from 'lucide-react'; // Add LinkIcon
 
-// Helper
 const formatDate = (dateString) =>
   new Date(dateString).toLocaleDateString('id-ID', {
     day: 'numeric',
@@ -21,9 +21,10 @@ const formatCurrency = (number) =>
     minimumFractionDigits: 0,
   }).format(number || 0);
 
-function SpmListPage() {
+function SpmPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { selectedSatkerId, tahunAnggaran, isContextSet } = useSatker();
   const [spmToDelete, setSpmToDelete] = useState(null);
 
   const {
@@ -32,23 +33,26 @@ function SpmListPage() {
     isError,
     error,
   } = useQuery({
-    queryKey: ['spms'],
-    queryFn: async () => apiClient.get('/spm').then((res) => res.data),
+    queryKey: ['spms', { satker: selectedSatkerId, tahun: tahunAnggaran }],
+    queryFn: async () =>
+      apiClient
+        .get('/spm', {
+          params: { satkerId: selectedSatkerId, tahun: tahunAnggaran },
+        })
+        .then((res) => res.data),
+    enabled: isContextSet,
   });
 
   const deleteSpmMutation = useMutation({
     mutationFn: (spmId) => apiClient.delete(`/spm/${spmId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['spms'] });
-      queryClient.invalidateQueries({ queryKey: ['allRincian'] });
       setSpmToDelete(null);
     },
-    onError: (error) => {
+    onError: (error) =>
       alert(
         `Gagal menghapus SPM: ${error.response?.data?.error || error.message}`
-      );
-      setSpmToDelete(null);
-    },
+      ),
   });
 
   const openDeleteModal = (spm) => setSpmToDelete(spm);
@@ -57,6 +61,10 @@ function SpmListPage() {
       deleteSpmMutation.mutate(spmToDelete.id);
     }
   };
+
+  const isProvAndNoSatkerSelected =
+    (user?.role === 'op_prov' || user?.role === 'supervisor') &&
+    !selectedSatkerId;
 
   return (
     <>
@@ -68,23 +76,45 @@ function SpmListPage() {
               Kelola dan pantau semua Surat Perintah Membayar yang terdaftar.
             </p>
           </div>
-          <Link to="/spm/baru" className="btn-primary w-full md:w-auto">
-            <Plus size={18} />
-            <span>Buat SPM Baru</span>
-          </Link>
+          <div
+            className="relative w-full md:w-auto"
+            title={
+              isProvAndNoSatkerSelected
+                ? 'Silakan pilih Satker spesifik di Dashboard untuk membuat SPM baru'
+                : ''
+            }
+          >
+            <Link
+              to="/spm/baru"
+              className={`btn-primary w-full ${
+                isProvAndNoSatkerSelected || !isContextSet
+                  ? 'opacity-50 cursor-not-allowed'
+                  : ''
+              }`}
+              onClick={(e) => {
+                if (isProvAndNoSatkerSelected || !isContextSet)
+                  e.preventDefault();
+              }}
+              aria-disabled={isProvAndNoSatkerSelected || !isContextSet}
+            >
+              <Plus size={18} />
+              <span>Buat SPM Baru</span>
+            </Link>
+          </div>
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-md">
-          {isLoading && (
+          {!isContextSet ? (
+            <p className="text-center text-gray-500 py-10">
+              Silakan atur konteks di Dashboard untuk melihat data SPM.
+            </p>
+          ) : isLoading ? (
             <p className="text-center text-gray-500 py-10">Memuat data...</p>
-          )}
-          {isError && (
+          ) : isError ? (
             <p className="text-center text-red-500 py-10">
               Error: {error.message}
             </p>
-          )}
-
-          {!isLoading && !isError && spms && (
+          ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -139,7 +169,7 @@ function SpmListPage() {
                         colSpan={user?.role !== 'op_satker' ? 7 : 6}
                         className="text-center py-8 text-gray-500"
                       >
-                        Tidak ada data SPM yang ditemukan.
+                        Tidak ada data SPM yang ditemukan untuk konteks ini.
                       </td>
                     </tr>
                   ) : (
@@ -149,7 +179,20 @@ function SpmListPage() {
                         className="hover:bg-gray-50 transition-colors"
                       >
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {spm.nomorSpm}
+                          <div className="flex items-center gap-2">
+                            {spm.driveLink && (
+                              <a
+                                href={spm.driveLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Buka tautan G-Drive"
+                                className="text-blue-500 hover:text-blue-700"
+                              >
+                                <LinkIcon className="w-4 h-4" />
+                              </a>
+                            )}
+                            <span>{spm.nomorSpm}</span>
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                           {formatDate(spm.tanggal)}
@@ -171,7 +214,7 @@ function SpmListPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-4">
                           <Link
                             to={`/spm/${spm.id}/edit`}
-                            className="inline-flex items-center gap-1.5 text-bpsBlue-dark hover:text-bpsBlue-light transition-colors font-semibold"
+                            className="inline-flex items-center gap-1.5 text-bpsBlue-dark hover:text-bpsBlue-light font-semibold"
                           >
                             <Edit size={14} /> <span>Detail</span>
                           </Link>
@@ -179,7 +222,7 @@ function SpmListPage() {
                             <button
                               onClick={() => openDeleteModal(spm)}
                               disabled={deleteSpmMutation.isPending}
-                              className="inline-flex items-center gap-1.5 text-danger hover:text-danger-dark disabled:opacity-50 transition-colors font-semibold"
+                              className="inline-flex items-center gap-1.5 text-danger hover:text-danger-dark disabled:opacity-50 font-semibold"
                             >
                               <Trash2 size={14} /> <span>Hapus</span>
                             </button>
@@ -194,7 +237,6 @@ function SpmListPage() {
           )}
         </div>
       </div>
-
       <Modal
         isOpen={!!spmToDelete}
         onClose={() => setSpmToDelete(null)}
@@ -231,4 +273,4 @@ function SpmListPage() {
   );
 }
 
-export default SpmListPage;
+export default SpmPage;
