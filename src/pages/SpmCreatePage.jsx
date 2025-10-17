@@ -324,7 +324,7 @@ function SpmCreatePage({ isEditMode = false }) {
                 </div>
                 <div className="lg:col-span-2">
                   <label className="form-label flex items-center gap-2">
-                    <LinkIcon size={14} /> Tautan Google Drive (Opsional)
+                    <LinkIcon size={14} /> Tautan Google Drive
                   </label>
                   <input
                     type="url"
