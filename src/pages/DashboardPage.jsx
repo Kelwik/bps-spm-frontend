@@ -1,3 +1,5 @@
+// src/pages/DashboardPage.jsx
+
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useSatker } from '../contexts/SatkerContext';
@@ -63,6 +65,10 @@ function ContextControls({ isContextSet, setIsContextSet }) {
     setDraftTahun(tahunAnggaran);
   }, [selectedSatkerId, tahunAnggaran]);
 
+  // --- HELPER: Check if user is restricted to a single Satker ---
+  // Applies to both 'op_satker' AND 'viewer'
+  const isSatkerUser = user?.role === 'op_satker' || user?.role === 'viewer';
+
   // Handle applying or changing the context
   const handleToggleContext = () => {
     if (isContextSet) {
@@ -70,8 +76,9 @@ function ContextControls({ isContextSet, setIsContextSet }) {
       setIsContextSet(false);
     } else {
       // If context is not set, apply the draft selections
-      // Only set satkerId if user is not op_satker (op_satker uses their own)
-      if (user.role !== 'op_satker') {
+      // Only set satkerId if user is NOT restricted (admins can choose)
+      // Restricted users (op_satker/viewer) already have it set in Context
+      if (!isSatkerUser) {
         setSelectedSatkerId(draftSatker ? parseInt(draftSatker) : null);
       }
       setTahunAnggaran(draftTahun);
@@ -95,18 +102,14 @@ function ContextControls({ isContextSet, setIsContextSet }) {
           </label>
           <select
             className="form-input"
-            // Use user's satkerId if op_satker, otherwise use draftSatker
-            value={user.role === 'op_satker' ? user.satkerId : draftSatker}
+            // Use user's satkerId if restricted, otherwise use draftSatker
+            value={isSatkerUser ? user.satkerId : draftSatker}
             onChange={(e) => setDraftSatker(e.target.value)}
-            // Disable if context is set, user is op_satker, or satkers are loading
-            disabled={
-              isContextSet || user.role === 'op_satker' || isLoadingSatkers
-            }
+            // Disable if context is set, user is restricted, or loading
+            disabled={isContextSet || isSatkerUser || isLoadingSatkers}
           >
-            {/* Show "Semua Satker" option only for non-op_satker users */}
-            {user.role !== 'op_satker' && (
-              <option value="">Semua Satker</option>
-            )}
+            {/* Show "Semua Satker" option only for non-restricted users */}
+            {!isSatkerUser && <option value="">Semua Satker</option>}
             {/* Populate with fetched satker list */}
             {satkerList?.map((s) => (
               <option key={s.id} value={s.id}>
@@ -129,7 +132,6 @@ function ContextControls({ isContextSet, setIsContextSet }) {
             <option value="2025">2025</option>
             <option value="2024">2024</option>
             <option value="2023">2023</option>
-            {/* Add more years if needed */}
           </select>
         </div>
         {/* Apply/Change Context Button */}
@@ -154,14 +156,13 @@ function DashboardPage() {
   const { selectedSatkerId, tahunAnggaran, isContextSet, setIsContextSet } =
     useSatker();
 
-  // --- MODIFIED useQuery FOR STATS ---
+  // Use a unique key for this non-paginated query
   const {
     data, // This will contain { spms: [...all SPMs], totalCount: ... }
     isLoading,
     isError,
     error,
   } = useQuery({
-    // Use a unique key for this non-paginated query
     queryKey: [
       'spmsDashboardStats',
       { satker: selectedSatkerId, tahun: tahunAnggaran },
@@ -172,14 +173,12 @@ function DashboardPage() {
         params: {
           satkerId: selectedSatkerId,
           tahun: tahunAnggaran,
-          // NOTE: 'page' and 'limit' are intentionally omitted here
         },
       });
-      return res.data; // Expecting the modified backend response
+      return res.data;
     },
     enabled: isContextSet, // Only fetch when context is applied
   });
-  // --- END OF MODIFIED useQuery ---
 
   // Get the list of all Satkers for displaying names
   const { data: satkerList } = useQuery({
@@ -192,9 +191,7 @@ function DashboardPage() {
 
   // Calculate statistics based on the fetched data
   const stats = {
-    // Use totalCount directly from the API response for the total card
     total: data?.totalCount || 0,
-    // Calculate status counts by filtering the FULL list of SPMs
     diterima:
       allSpmsForStats?.filter((spm) => spm.status === 'DITERIMA').length || 0,
     ditolak:
@@ -210,13 +207,15 @@ function DashboardPage() {
     { name: 'Diterima', total: stats.diterima, color: '#22c55e' }, // Green
   ];
 
+  // --- HELPER: Check if user is restricted ---
+  const isSatkerUser = user?.role === 'op_satker' || user?.role === 'viewer';
+
   // Determine the name of the currently selected Satker for display
-  const currentSatkerName =
-    user?.role === 'op_satker'
-      ? satkerList?.find((s) => s.id === user.satkerId)?.nama // op_satker's assigned satker
-      : selectedSatkerId
-      ? satkerList?.find((s) => s.id === selectedSatkerId)?.nama // Admin/prov selected satker
-      : 'Semua Satker'; // Default when no specific satker is selected
+  const currentSatkerName = isSatkerUser
+    ? satkerList?.find((s) => s.id === user.satkerId)?.nama // Restricted user's assigned satker
+    : selectedSatkerId
+    ? satkerList?.find((s) => s.id === selectedSatkerId)?.nama // Admin/prov selected specific satker
+    : 'Semua Satker'; // Default when no specific satker is selected
 
   return (
     <div className="space-y-8">
@@ -277,7 +276,6 @@ function DashboardPage() {
               <>
                 {/* Summary Cards Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {/* Pass the correctly calculated stats to the cards */}
                   <SummaryCard
                     icon={
                       <FileSpreadsheet size={28} className="text-blue-500" />
@@ -337,7 +335,6 @@ function DashboardPage() {
                             border: '1px solid #e5e7eb',
                           }}
                         />
-                        {/* Bar with custom cell colors */}
                         <Bar dataKey="total" radius={[4, 4, 0, 0]}>
                           {chartData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />

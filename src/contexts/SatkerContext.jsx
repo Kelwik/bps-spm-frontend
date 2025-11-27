@@ -1,6 +1,8 @@
+// src/contexts/SatkerContext.jsx
+
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useState, useContext, useEffect } from 'react';
-import { useAuth } from './AuthContext'; // We need info about the logged-in user
+import { useAuth } from './AuthContext';
 
 const SatkerContext = createContext(null);
 
@@ -13,21 +15,24 @@ export const SatkerProvider = ({ children }) => {
     new Date().getFullYear().toString()
   );
 
-  // --- 1. NEW STATE TO ACT AS THE GLOBAL LOCK ---
-  // This state will determine if the application is "locked" or "unlocked".
+  // This state determines if the application is "locked" or "unlocked".
   const [isContextSet, setIsContextSet] = useState(false);
 
   useEffect(() => {
     // If the user changes, reset the context so the new user must select again.
     setIsContextSet(false);
-    if (user && user.role === 'op_satker') {
+
+    // --- MODIFIED LOGIC FOR VIEWER ---
+    // Treat 'viewer' the same as 'op_satker': Lock them to their ID
+    const isSatkerUser = user?.role === 'op_satker' || user?.role === 'viewer';
+
+    if (user && isSatkerUser) {
       setSelectedSatkerId(user.satkerId);
-    } else if (user && user.role !== 'op_satker') {
+    } else if (user && !isSatkerUser) {
       setSelectedSatkerId(null);
     }
   }, [user]);
 
-  // --- 2. ADD isContextSet AND ITS SETTER TO THE CONTEXT VALUE ---
   const value = {
     selectedSatkerId,
     setSelectedSatkerId,

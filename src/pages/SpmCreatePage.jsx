@@ -1,4 +1,4 @@
-// kelwik/bps-spm-frontend/bps-spm-frontend-ec073fa18a733bbbf7adc115bd5c2587780eeca5/src/pages/SpmCreatePage.jsx
+// src/pages/SpmCreatePage.jsx
 
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
@@ -8,18 +8,16 @@ import apiClient from '../api';
 import RincianGroup from '../components/RincianGroup';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import StatusBadge from '../components/StatusBadge';
-import CommentModal from '../components/CommentModal'; // For rejection
-import Modal from '../components/Modal'; // Generic modal for confirmation
+import CommentModal from '../components/CommentModal';
+import Modal from '../components/Modal';
 import {
   Plus,
   Building,
   MessageSquareWarning,
   Link as LinkIcon,
-  AlertTriangle, // Keep existing icon from Modal for now
-  CheckCircle, // Use a check icon for confirmation title
+  CheckCircle,
 } from 'lucide-react';
 
-// formatCurrency and getDefaultTanggal remain the same...
 const formatCurrency = (number) =>
   new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -42,6 +40,9 @@ function SpmCreatePage({ isEditMode = false }) {
   const { user } = useAuth();
   const { selectedSatkerId, tahunAnggaran: selectedYear } = useSatker();
 
+  // --- 1. CHECK IF USER IS VIEWER ---
+  const isViewer = user?.role === 'viewer';
+
   const [spmData, setSpmData] = useState({
     nomorSpm: '',
     tanggal: getDefaultTanggal(selectedYear),
@@ -52,9 +53,7 @@ function SpmCreatePage({ isEditMode = false }) {
   const [rincianGroups, setRincianGroups] = useState([]);
   const [error, setError] = useState(null);
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
-  const [isAcceptModalOpen, setIsAcceptModalOpen] = useState(false); // <-- New state for accept confirmation
-
-  // ... (useEffect for safeguarding op_prov remains the same) ...
+  const [isAcceptModalOpen, setIsAcceptModalOpen] = useState(false);
 
   const handleSpmDataChange = (e) => {
     const { name, value } = e.target;
@@ -65,20 +64,17 @@ function SpmCreatePage({ isEditMode = false }) {
     .flatMap((g) => g.items)
     .reduce((sum, item) => sum + (Number(item.jumlah) || 0), 0);
 
-  // ... (useQuery for existingSpmData remains the same) ...
   const { data: existingSpmData, isLoading: isLoadingSpm } = useQuery({
     queryKey: ['spm', spmId],
     queryFn: async () => apiClient.get(`/spm/${spmId}`).then((res) => res.data),
     enabled: isEditMode && !!spmId,
   });
 
-  // ... (useQuery for satkerList remains the same) ...
   const { data: satkerList, isLoading: isLoadingSatkers } = useQuery({
     queryKey: ['satkers'],
     queryFn: async () => apiClient.get('/satker').then((res) => res.data),
   });
 
-  // ... (Determining satkerIdForSpm and satkerName remains the same) ...
   const satkerIdForSpm = isEditMode
     ? existingSpmData?.satkerId
     : selectedSatkerId;
@@ -87,7 +83,6 @@ function SpmCreatePage({ isEditMode = false }) {
     : satkerList?.find((s) => s.id === satkerIdForSpm)?.nama ||
       'Tidak Diketahui';
 
-  // ... (useEffect for populating form in edit mode remains the same) ...
   useEffect(() => {
     if (isEditMode && existingSpmData) {
       setSpmData({
@@ -114,7 +109,6 @@ function SpmCreatePage({ isEditMode = false }) {
     }
   }, [isEditMode, existingSpmData]);
 
-  // ... (useMutation for saveSpm remains the same) ...
   const { mutate: saveSpm, isPending: isSaving } = useMutation({
     mutationFn: (payload) =>
       isEditMode
@@ -134,48 +128,36 @@ function SpmCreatePage({ isEditMode = false }) {
       ),
   });
 
-  // --- updateStatusMutation remains the same ---
   const updateStatusMutation = useMutation({
-    mutationFn: (
-      { status, comment } // comment is optional here
-    ) => apiClient.patch(`/spm/${spmId}/status`, { status, comment }),
+    mutationFn: ({ status, comment }) =>
+      apiClient.patch(`/spm/${spmId}/status`, { status, comment }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['spms'] });
       queryClient.invalidateQueries({ queryKey: ['spm', spmId] });
-      // Close any open modals on success
       setIsCommentModalOpen(false);
       setIsAcceptModalOpen(false);
-      navigate('/spm'); // Navigate back after status update
+      navigate('/spm');
     },
     onError: (err) =>
       setError(err.response?.data?.error || 'Gagal memperbarui status SPM.'),
   });
 
-  // --- MODIFIED handleStatusUpdate ---
   const handleStatusUpdate = (newStatus) => {
     if (newStatus === 'DITOLAK') {
-      // Open comment modal for rejection
       setIsCommentModalOpen(true);
     } else if (newStatus === 'DITERIMA') {
-      // Open confirmation modal for acceptance
-      setIsAcceptModalOpen(true); // <-- Use state instead of window.confirm
+      setIsAcceptModalOpen(true);
     }
-    // No direct mutation call here anymore for DITERIMA
   };
 
-  // --- handleRejectSubmit remains the same ---
   const handleRejectSubmit = (comment) => {
     updateStatusMutation.mutate({ status: 'DITOLAK', comment });
-    // No need to close modal here, onSuccess handles it
   };
 
-  // --- NEW handler for confirming acceptance ---
   const handleConfirmAccept = () => {
     updateStatusMutation.mutate({ status: 'DITERIMA' });
-    // No need to close modal here, onSuccess handles it
   };
 
-  // ... (handleAddGroup, handleRemoveGroup, handleUpdateGroup remain the same) ...
   const handleAddGroup = () =>
     setRincianGroups([
       ...rincianGroups,
@@ -207,7 +189,6 @@ function SpmCreatePage({ isEditMode = false }) {
       )
     );
 
-  // ... (handleSubmit for saving/updating SPM remains the same) ...
   const handleSubmit = (event) => {
     event.preventDefault();
     setError(null);
@@ -219,6 +200,7 @@ function SpmCreatePage({ isEditMode = false }) {
       );
       return;
     }
+    // ... rincianForApi logic ...
     const rincianForApi = rincianGroups.flatMap((group) =>
       group.items.map((item) => ({
         id: isEditMode && item.spmId ? item.id : undefined,
@@ -243,15 +225,20 @@ function SpmCreatePage({ isEditMode = false }) {
     saveSpm(finalPayload);
   };
 
-  // ... (Logic for isFormDisabled, showValidationButtons, showSaveButtons remains the same) ...
-  const isFormDisabled = isEditMode && existingSpmData?.status === 'DITERIMA';
+  // --- 2. DISABLE FORM IF USER IS VIEWER ---
+  // If user is viewer, the form is ALWAYS disabled.
+  const isFormDisabled =
+    isViewer || (isEditMode && existingSpmData?.status === 'DITERIMA');
+
+  // --- 3. HIDE BUTTONS FOR VIEWERS ---
   const showValidationButtons =
+    !isViewer && // Hide if viewer
     isEditMode &&
     ['op_prov', 'supervisor'].includes(user.role) &&
     existingSpmData?.status === 'MENUNGGU';
-  const showSaveButtons = !isFormDisabled;
 
-  // ... (Loading state check remains the same) ...
+  const showSaveButtons = !isFormDisabled && !isViewer;
+
   if (isEditMode && isLoadingSpm) {
     return <div className="p-6 text-center">Memuat data SPM...</div>;
   }
@@ -259,11 +246,14 @@ function SpmCreatePage({ isEditMode = false }) {
   return (
     <>
       <div className="bg-white p-6 rounded-xl shadow-md">
-        {/* ... (Header, Status Badge, Rejection Comment display remain the same) ... */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-6">
           <div className="mb-4 sm:mb-0">
             <h1 className="text-3xl font-bold text-gray-800">
-              {isEditMode ? 'Detail / Edit SPM' : 'Buat SPM Baru'}
+              {isEditMode
+                ? isViewer
+                  ? 'Detail SPM'
+                  : 'Detail / Edit SPM'
+                : 'Buat SPM Baru'}
             </h1>
             <p className="text-gray-500 mt-2 flex items-center gap-2">
               <Building size={16} />
@@ -292,7 +282,15 @@ function SpmCreatePage({ isEditMode = false }) {
             </div>
           )}
 
-        {isFormDisabled && (
+        {/* Show message for Viewers */}
+        {isViewer && (
+          <div className="bg-blue-50 p-4 mb-6 rounded-md border border-blue-200 text-blue-800">
+            Anda sedang dalam <strong>Mode Lihat (Read-Only)</strong>. Anda
+            tidak dapat mengubah data SPM.
+          </div>
+        )}
+
+        {isFormDisabled && !isViewer && (
           <div className="bg-blue-100 p-4 mb-6 rounded-md">
             SPM ini sudah <strong>Diterima</strong> dan tidak dapat diubah lagi.
           </div>
@@ -364,7 +362,7 @@ function SpmCreatePage({ isEditMode = false }) {
               </div>
             </div>
 
-            {/* ... (Daftar Rincian section remains the same) ... */}
+            {/* ... (Daftar Rincian section) ... */}
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-gray-700 border-b pb-2">
                 Daftar Rincian
@@ -380,13 +378,15 @@ function SpmCreatePage({ isEditMode = false }) {
                   />
                 ))}
               </div>
-              <button
-                type="button"
-                onClick={handleAddGroup}
-                className="btn-primary"
-              >
-                <Plus size={16} /> Tambah Kelompok Rincian
-              </button>
+              {!isViewer && (
+                <button
+                  type="button"
+                  onClick={handleAddGroup}
+                  className="btn-primary"
+                >
+                  <Plus size={16} /> Tambah Kelompok Rincian
+                </button>
+              )}
             </div>
           </fieldset>
 
@@ -397,7 +397,7 @@ function SpmCreatePage({ isEditMode = false }) {
                 <button
                   type="button"
                   onClick={() => handleStatusUpdate('DITOLAK')}
-                  disabled={updateStatusMutation.isPending} // Disable if any status update is pending
+                  disabled={updateStatusMutation.isPending}
                   className="btn-danger"
                 >
                   Tolak & Kembalikan
@@ -405,43 +405,44 @@ function SpmCreatePage({ isEditMode = false }) {
                 <button
                   type="button"
                   onClick={() => handleStatusUpdate('DITERIMA')}
-                  disabled={updateStatusMutation.isPending} // Disable if any status update is pending
+                  disabled={updateStatusMutation.isPending}
                   className="btn-success"
                 >
                   Terima & Finalisasi
                 </button>
               </>
             )}
+
+            {/* Always show "Kembali" button, but hide "Simpan" for viewers */}
+            <button
+              type="button"
+              onClick={() => navigate('/spm')}
+              className="btn-secondary"
+              disabled={isSaving || updateStatusMutation.isPending}
+            >
+              {isViewer ? 'Kembali' : 'Batal'}
+            </button>
+
             {showSaveButtons && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => navigate('/spm')}
-                  className="btn-secondary"
-                  disabled={isSaving || updateStatusMutation.isPending} // Disable if saving or status updating
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  disabled={isSaving || updateStatusMutation.isPending} // Disable if saving or status updating
-                >
-                  {isSaving
-                    ? isEditMode
-                      ? 'Memperbarui...'
-                      : 'Menyimpan...'
-                    : isEditMode
-                    ? 'Update SPM'
-                    : 'Simpan SPM'}
-                </button>
-              </>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={isSaving || updateStatusMutation.isPending}
+              >
+                {isSaving
+                  ? isEditMode
+                    ? 'Memperbarui...'
+                    : 'Menyimpan...'
+                  : isEditMode
+                  ? 'Update SPM'
+                  : 'Simpan SPM'}
+              </button>
             )}
           </div>
         </form>
       </div>
 
-      {/* Rejection Comment Modal (remains the same) */}
+      {/* Modals (only needed if buttons are shown, but safe to keep) */}
       <CommentModal
         isOpen={isCommentModalOpen}
         onClose={() => setIsCommentModalOpen(false)}
@@ -449,11 +450,9 @@ function SpmCreatePage({ isEditMode = false }) {
         isSubmitting={updateStatusMutation.isPending}
       />
 
-      {/* --- NEW Acceptance Confirmation Modal --- */}
       <Modal
         isOpen={isAcceptModalOpen}
         onClose={() => setIsAcceptModalOpen(false)}
-        // Use a more appropriate title, maybe with a check icon
         title={
           <span className="flex items-center gap-2 text-green-700">
             <CheckCircle size={20} /> Konfirmasi Penerimaan SPM
@@ -470,7 +469,7 @@ function SpmCreatePage({ isEditMode = false }) {
             </button>
             <button
               onClick={handleConfirmAccept}
-              className="btn-success" // Use success button style
+              className="btn-success"
               disabled={updateStatusMutation.isPending}
             >
               {updateStatusMutation.isPending

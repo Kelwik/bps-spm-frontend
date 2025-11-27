@@ -1,3 +1,5 @@
+// src/pages/SpmPage.jsx
+
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
@@ -30,6 +32,9 @@ function SpmPage() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  // --- 1. CHECK IF USER IS VIEWER ---
+  const isViewer = user?.role === 'viewer';
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: [
@@ -89,31 +94,35 @@ function SpmPage() {
               Kelola dan pantau semua Surat Perintah Membayar yang terdaftar.
             </p>
           </div>
-          <div
-            className="relative w-full md:w-auto"
-            title={
-              isProvAndNoSatkerSelected
-                ? 'Silakan pilih Satker spesifik di Dashboard untuk membuat SPM baru'
-                : ''
-            }
-          >
-            <Link
-              to="/spm/baru"
-              className={`btn-primary w-full ${
-                isProvAndNoSatkerSelected || !isContextSet
-                  ? 'opacity-50 cursor-not-allowed'
+
+          {/* --- 2. HIDE CREATE BUTTON FOR VIEWERS --- */}
+          {!isViewer && (
+            <div
+              className="relative w-full md:w-auto"
+              title={
+                isProvAndNoSatkerSelected
+                  ? 'Silakan pilih Satker spesifik di Dashboard untuk membuat SPM baru'
                   : ''
-              }`}
-              onClick={(e) => {
-                if (isProvAndNoSatkerSelected || !isContextSet)
-                  e.preventDefault();
-              }}
-              aria-disabled={isProvAndNoSatkerSelected || !isContextSet}
+              }
             >
-              <Plus size={18} />
-              <span>Buat SPM Baru</span>
-            </Link>
-          </div>
+              <Link
+                to="/spm/baru"
+                className={`btn-primary w-full ${
+                  isProvAndNoSatkerSelected || !isContextSet
+                    ? 'opacity-50 cursor-not-allowed'
+                    : ''
+                }`}
+                onClick={(e) => {
+                  if (isProvAndNoSatkerSelected || !isContextSet)
+                    e.preventDefault();
+                }}
+                aria-disabled={isProvAndNoSatkerSelected || !isContextSet}
+              >
+                <Plus size={18} />
+                <span>Buat SPM Baru</span>
+              </Link>
+            </div>
+          )}
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-md">
@@ -121,7 +130,7 @@ function SpmPage() {
             <p className="text-center text-gray-500 py-10">
               Silakan atur konteks di Dashboard untuk melihat data SPM.
             </p>
-          ) : isLoading && !data ? ( // Show loading only on initial fetch
+          ) : isLoading && !data ? (
             <p className="text-center text-gray-500 py-10">Memuat data...</p>
           ) : isError ? (
             <p className="text-center text-red-500 py-10">
@@ -133,42 +142,24 @@ function SpmPage() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Nomor SPM
                       </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Tanggal
                       </th>
                       {user?.role !== 'op_satker' && (
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Satker
                         </th>
                       )}
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Total Anggaran
                       </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Jml. Rincian
                       </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
                       </th>
                       <th scope="col" className="relative px-6 py-3">
@@ -226,21 +217,26 @@ function SpmPage() {
                             <StatusBadge status={spm.status} />
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-4">
+                            {/* Link text changed to 'Lihat' for viewers */}
                             <Link
                               to={`/spm/${spm.id}/edit`}
                               className="inline-flex items-center gap-1.5 text-bpsBlue-dark hover:text-bpsBlue-light font-semibold"
                             >
-                              <Edit size={14} /> <span>Detail</span>
+                              <Edit size={14} />{' '}
+                              <span>{isViewer ? 'Lihat' : 'Detail'}</span>
                             </Link>
-                            {['MENUNGGU', 'DITOLAK'].includes(spm.status) && (
-                              <button
-                                onClick={() => openDeleteModal(spm)}
-                                disabled={deleteSpmMutation.isPending}
-                                className="inline-flex items-center gap-1.5 text-danger hover:text-danger-dark disabled:opacity-50 font-semibold"
-                              >
-                                <Trash2 size={14} /> <span>Hapus</span>
-                              </button>
-                            )}
+
+                            {/* --- 3. HIDE DELETE BUTTON FOR VIEWERS --- */}
+                            {!isViewer &&
+                              ['MENUNGGU', 'DITOLAK'].includes(spm.status) && (
+                                <button
+                                  onClick={() => openDeleteModal(spm)}
+                                  disabled={deleteSpmMutation.isPending}
+                                  className="inline-flex items-center gap-1.5 text-danger hover:text-danger-dark disabled:opacity-50 font-semibold"
+                                >
+                                  <Trash2 size={14} /> <span>Hapus</span>
+                                </button>
+                              )}
                           </td>
                         </tr>
                       ))
