@@ -257,7 +257,7 @@ function UserManagementPage() {
                         {user.role.replace('_', ' ').toUpperCase()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {user.satker?.nama || 'N/A'}
+                        {user.satker?.nama || 'BPS Provinsi Gorontalo'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-4">
                         <button

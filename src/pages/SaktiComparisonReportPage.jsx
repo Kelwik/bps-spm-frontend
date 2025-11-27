@@ -246,7 +246,7 @@ function SaktiComparisonReportPage() {
                 <span className="font-medium text-gray-600 text-sm sm:text-base">
                   {fileName
                     ? `File: ${fileName}`
-                    : 'Pilih file Laporan Realisasi (.csv/.xlsx)...'}
+                    : 'Pilih file Laporan Realisasi (.xlsx)...'}
                 </span>
               </span>
               <input
