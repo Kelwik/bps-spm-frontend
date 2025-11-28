@@ -1,6 +1,6 @@
 // src/pages/SaktiComparisonReportPage.jsx
 
-import { useState, useMemo } from 'react'; // Keep useMemo
+import { useState, useMemo } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import apiClient from '../api';
 import { useSatker } from '../contexts/SatkerContext';
@@ -9,14 +9,13 @@ import {
   CheckCircle,
   AlertTriangle,
   MinusCircle,
-  FileSpreadsheet,
   Info,
 } from 'lucide-react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import Pagination from '../components/Pagination'; // Keep Pagination import
+import Pagination from '../components/Pagination';
 
-// Helper functions (formatCurrency, getStatusProps) remain the same
+// Helper functions
 const formatCurrency = (number) => {
   if (number === null || number === undefined) return '-';
   const numericValue = Number(number);
@@ -65,7 +64,9 @@ function SaktiComparisonReportPage() {
   const [file, setFile] = useState(null);
   const [fileName, setFileName] = useState('');
   const [isParsing, setIsParsing] = useState(false);
-  const { tahunAnggaran, isContextSet } = useSatker();
+
+  const { tahunAnggaran, isContextSet, selectedSatkerId } = useSatker();
+
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
 
@@ -77,13 +78,16 @@ function SaktiComparisonReportPage() {
     reset,
   } = useMutation({
     mutationFn: (parsedData) =>
-      apiClient.post(`/spm/validate-report?tahun=${tahunAnggaran}`, parsedData),
+      apiClient.post(
+        `/spm/validate-report?tahun=${tahunAnggaran}&satkerId=${selectedSatkerId}`,
+        parsedData
+      ),
     onError: (err) => {
       console.error('Validation API call failed:', err);
     },
     onSuccess: (response) => {
       console.log('Validation successful, API returned response:', response);
-      setCurrentPage(1); // Reset page on success
+      setCurrentPage(1);
     },
   });
 
@@ -102,11 +106,13 @@ function SaktiComparisonReportPage() {
     }
   };
 
+  const canValidate = isContextSet && selectedSatkerId;
+
   const handleUploadAndValidate = () => {
-    if (!file || !isContextSet) {
-      if (!isContextSet) {
+    if (!file || !canValidate) {
+      if (!canValidate) {
         alert(
-          'Harap terapkan konteks (Satker & Tahun) di Dashboard terlebih dahulu.'
+          'Harap pilih Satuan Kerja spesifik di Dashboard terlebih dahulu (bukan "Semua Satker").'
         );
       }
       return;
@@ -174,60 +180,43 @@ function SaktiComparisonReportPage() {
   const isProcessing = isParsing || isPending;
   const allResults = validationResponse?.data;
 
-  // --- *** MODIFIED Sorting Logic using useMemo *** ---
   const sortedResults = useMemo(() => {
     if (!Array.isArray(allResults)) {
       return [];
     }
     return [...allResults].sort((a, b) => {
-      // Check if items were found in SAKTI (MATCH or MISMATCH) vs NOT_FOUND
       const aFound = a.status !== 'NOT_FOUND';
       const bFound = b.status !== 'NOT_FOUND';
 
-      // Prioritize found items
-      if (aFound && !bFound) {
-        return -1; // a (found) comes before b (not found)
-      }
-      if (!aFound && bFound) {
-        return 1; // b (found) comes before a (not found)
-      }
+      if (aFound && !bFound) return -1;
+      if (!aFound && bFound) return 1;
 
-      // If both are found OR both are not found, sort by spmNomor then uraian
       if (a.spmNomor !== b.spmNomor) {
         return (a.spmNomor || '').localeCompare(b.spmNomor || '');
       }
       return (a.rincianUraian || '').localeCompare(b.rincianUraian || '');
     });
-  }, [allResults]); // Re-sort only when allResults changes
-  // --- *** END MODIFIED Sorting Logic *** ---
+  }, [allResults]);
 
-  // Pagination Logic (remains the same)
   const totalItems = sortedResults.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentItems = sortedResults.slice(startIndex, endIndex);
 
-  console.log('Rendering SaktiComparisonReportPage:', {
-    /* ... console logs ... */
-  });
-
   return (
     <div className="space-y-6">
-      {/* Page Header (no changes) */}
       <div>
         <h1 className="text-3xl font-bold text-gray-800">
           Laporan Biaya SAKTI
         </h1>
         <p className="text-gray-500 mt-1">
-          {isContextSet
-            ? `Bandingkan realisasi anggaran per rincian antara data aplikasi SPM dengan laporan SAKTI untuk tahun anggaran `
-            : 'Harap atur konteks di Dashboard terlebih dahulu. Laporan akan menggunakan tahun anggaran '}
-          <span className="font-semibold">{tahunAnggaran}</span>.
+          {canValidate
+            ? `Bandingkan data aplikasi dengan laporan SAKTI tahun ${tahunAnggaran}.`
+            : 'Harap atur konteks (Satker Spesifik & Tahun) di Dashboard.'}
         </p>
       </div>
 
-      {/* File Upload Section (no changes) */}
       <div className="bg-white p-6 rounded-xl shadow-md">
         <h2 className="text-xl font-semibold text-gray-700 mb-4">
           Unggah Laporan SAKTI
@@ -236,7 +225,7 @@ function SaktiComparisonReportPage() {
           <label htmlFor="file-upload" className="flex-grow">
             <div
               className={`flex items-center justify-center w-full h-24 sm:h-auto sm:min-h-[5rem] px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-md appearance-none ${
-                isContextSet
+                canValidate
                   ? 'cursor-pointer hover:border-gray-400'
                   : 'cursor-not-allowed bg-gray-50'
               } focus:outline-none`}
@@ -255,37 +244,39 @@ function SaktiComparisonReportPage() {
                 accept=".csv, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
                 className="hidden"
                 onChange={handleFileChange}
-                disabled={!isContextSet}
+                disabled={!canValidate}
               />
             </div>
           </label>
           <button
             onClick={handleUploadAndValidate}
-            disabled={!file || isProcessing || !isContextSet}
+            disabled={!file || isProcessing || !canValidate}
             className="btn-primary h-auto sm:h-full px-6 py-3 sm:px-8 text-base disabled:opacity-50 disabled:cursor-not-allowed"
             title={
-              !isContextSet ? 'Harap terapkan konteks di Dashboard dulu' : ''
+              !canValidate
+                ? 'Harap pilih Satker spesifik di Dashboard dulu'
+                : ''
             }
           >
             {isProcessing ? 'Memproses...' : 'Bandingkan Data'}
           </button>
         </div>
-        {!isContextSet && (
+        {!canValidate && (
           <p className="mt-4 text-sm text-orange-600 flex items-center gap-1">
             <Info size={16} />
-            Anda perlu menerapkan konteks Tahun Anggaran di Dashboard.
+            Anda harus memilih <strong>Satuan Kerja spesifik</strong> (bukan
+            "Semua Satker") dan Tahun Anggaran di Dashboard.
           </p>
         )}
         {validationError && (
           <p className="mt-4 text-sm text-red-600 flex items-center gap-1">
             <AlertTriangle size={16} />
-            Terjadi kesalahan saat validasi:{' '}
+            Terjadi kesalahan:{' '}
             {validationError.response?.data?.error || validationError.message}
           </p>
         )}
       </div>
 
-      {/* Results Section */}
       {isProcessing && (
         <div className="bg-white rounded-xl shadow-md p-6 text-center text-gray-500">
           Membandingkan data...
@@ -295,40 +286,24 @@ function SaktiComparisonReportPage() {
       {!isProcessing && (validationResponse || validationError) && (
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           <h2 className="text-xl font-bold text-gray-800 p-6 border-b">
-            Hasil Perbandingan Rincian Biaya (Tahun {tahunAnggaran})
+            Hasil Perbandingan (Tahun {tahunAnggaran})
           </h2>
 
           {validationError && (
             <p className="p-6 text-center text-red-500 italic">
-              Tidak dapat menampilkan hasil karena terjadi kesalahan saat
-              mengambil data.
+              Gagal memuat data.
             </p>
           )}
 
-          {!validationError && (
+          {!validationError && Array.isArray(allResults) && (
             <>
-              {!Array.isArray(allResults) && ( // Check raw API data
-                <p className="p-6 text-center text-gray-500 italic">
-                  Format data hasil validasi tidak dikenali.
-                </p>
-              )}
-
-              {/* Use sortedResults.length for empty check */}
-              {Array.isArray(allResults) && sortedResults.length === 0 && (
+              {sortedResults.length === 0 ? (
                 <p className="p-6 text-center text-gray-500">
-                  Tidak ada data rincian yang cocok ditemukan antara data
-                  aplikasi tahun {tahunAnggaran} dan file SAKTI yang diunggah.
+                  Tidak ada data rincian yang cocok ditemukan.
                 </p>
-              )}
-
-              {/* Render Table if sortedResults has items */}
-              {Array.isArray(allResults) && sortedResults.length > 0 && (
+              ) : (
                 <>
                   <div className="overflow-x-auto">
-                    {console.log(
-                      'Attempting to render table with currentItems:',
-                      currentItems
-                    )}
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50 sticky top-0 z-20">
                         <tr>
@@ -338,6 +313,9 @@ function SaktiComparisonReportPage() {
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Akun & Uraian (Aplikasi)
                           </th>
+
+                          {/* Removed Pagu Columns */}
+
                           <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Jumlah (Aplikasi)
                           </th>
@@ -353,7 +331,6 @@ function SaktiComparisonReportPage() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {/* Map over currentItems (paginated and sorted data) */}
                         {currentItems.map((result, index) => {
                           const { Icon, color, text, bgColor } = getStatusProps(
                             result.status
@@ -372,7 +349,6 @@ function SaktiComparisonReportPage() {
                                   : 'hover:bg-gray-50'
                               } transition-colors duration-150 ease-in-out`}
                             >
-                              {/* ... (td elements remain the same) ... */}
                               <td
                                 className={`px-6 py-4 whitespace-nowrap text-xs text-gray-500 sticky left-0 z-10 border-r ${
                                   isMismatch
@@ -399,6 +375,9 @@ function SaktiComparisonReportPage() {
                                   {result.rincianUraian}
                                 </span>
                               </td>
+
+                              {/* Removed Pagu Data Cells */}
+
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right font-mono">
                                 {formatCurrency(result.appAmount)}
                               </td>
@@ -426,7 +405,6 @@ function SaktiComparisonReportPage() {
                       </tbody>
                     </table>
                   </div>
-                  {/* Pagination component */}
                   <div className="p-4 border-t">
                     <Pagination
                       currentPage={currentPage}
@@ -438,15 +416,6 @@ function SaktiComparisonReportPage() {
               )}
             </>
           )}
-        </div>
-      )}
-
-      {/* Initial state message */}
-      {!isProcessing && !validationResponse && !validationError && (
-        <div className="mt-6 text-center text-gray-500 italic">
-          {isContextSet
-            ? 'Unggah file laporan SAKTI format .csv atau .xlsx untuk memulai perbandingan.'
-            : 'Harap atur konteks di Dashboard terlebih dahulu.'}
         </div>
       )}
     </div>
