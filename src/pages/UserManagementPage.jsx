@@ -1,34 +1,35 @@
+// src/pages/UserManagementPage.jsx
+
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api';
 import Modal from '../components/Modal';
-import { Plus, Edit, Trash2, Users } from 'lucide-react';
+import { Plus, Edit, Trash2, Info } from 'lucide-react';
 
-// This is the form component used inside the modal for adding or editing a user.
+// Form component for Adding/Editing users
 function UserForm({ user, onSuccess, onCancel, isSaving }) {
   const [formData, setFormData] = useState({
     email: user?.email || '',
     name: user?.name || '',
-    role: user?.role || 'viewer',
+    role: user?.role || 'viewer', // Default role
     satkerId: user?.satkerId || '',
-    password: '',
   });
 
-  // Fetch the list of Satkers to populate the dropdown
+  // Fetch Satker list for the dropdown
   const { data: satkerList, isLoading: isLoadingSatkers } = useQuery({
     queryKey: ['satkers'],
     queryFn: () => apiClient.get('/satker').then((res) => res.data),
   });
 
-  // If the user being edited changes, update the form data
   useEffect(() => {
-    setFormData({
-      email: user?.email || '',
-      name: user?.name || '',
-      role: user?.role || 'viewer',
-      satkerId: user?.satkerId || '',
-      password: '',
-    });
+    if (user) {
+      setFormData({
+        email: user.email || '',
+        name: user.name || '',
+        role: user.role || 'viewer',
+        satkerId: user.satkerId || '',
+      });
+    }
   }, [user]);
 
   const handleChange = (e) => {
@@ -38,30 +39,20 @@ function UserForm({ user, onSuccess, onCancel, isSaving }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // In edit mode, if password is blank, don't send it so it isn't updated
+
+    // Send full payload (Email, Name, Role, Satker)
     const payload = { ...formData };
-    if (user?.id && !payload.password) {
-      delete payload.password;
-    }
+
     onSuccess(payload);
   };
 
+  // Check if the selected role requires a Satker
   const isSatkerRole =
     formData.role === 'op_satker' || formData.role === 'viewer';
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="form-label">Nama Lengkap</label>
-        <input
-          type="text"
-          name="name"
-          value={formData.name}
-          onChange={handleChange}
-          className="form-input"
-          required
-        />
-      </div>
+      {/* EMAIL: Read-only in Edit mode */}
       <div>
         <label className="form-label">Email</label>
         <input
@@ -71,6 +62,7 @@ function UserForm({ user, onSuccess, onCancel, isSaving }) {
           onChange={handleChange}
           className="form-input"
           disabled={!!user}
+          placeholder="nama.pengguna@bps.go.id"
           required
         />
         {user && (
@@ -79,6 +71,26 @@ function UserForm({ user, onSuccess, onCancel, isSaving }) {
           </p>
         )}
       </div>
+
+      {/* NAME: Editable in BOTH modes now */}
+      <div>
+        <label className="form-label">Nama Lengkap</label>
+        <input
+          type="text"
+          name="name"
+          value={formData.name}
+          onChange={handleChange}
+          className="form-input"
+          placeholder={!user ? 'Masukkan nama lengkap (Opsional)' : ''}
+        />
+        {!user && (
+          <p className="text-xs text-gray-500 mt-1">
+            Jika dikosongkan, nama akan diambil otomatis dari email.
+          </p>
+        )}
+      </div>
+
+      {/* ROLE */}
       <div>
         <label className="form-label">Peran (Role)</label>
         <select
@@ -87,12 +99,13 @@ function UserForm({ user, onSuccess, onCancel, isSaving }) {
           onChange={handleChange}
           className="form-input"
         >
-          <option value="supervisor">Supervisor</option>
           <option value="op_prov">Operator Provinsi</option>
           <option value="op_satker">Operator Satker</option>
           <option value="viewer">Viewer</option>
         </select>
       </div>
+
+      {/* SATKER: Conditional */}
       {isSatkerRole && (
         <div>
           <label className="form-label">Satuan Kerja (Satker)</label>
@@ -113,31 +126,38 @@ function UserForm({ user, onSuccess, onCancel, isSaving }) {
           </select>
         </div>
       )}
-      <div>
-        <label className="form-label">Password</label>
-        <input
-          type="password"
-          name="password"
-          value={formData.password}
-          onChange={handleChange}
-          className="form-input"
-          placeholder={user ? 'Kosongkan jika tidak ingin diubah' : ''}
-          required={!user}
-        />
-      </div>
-      <div className="flex justify-end gap-3 pt-4">
+
+      {/* INFO BOX: Only about Password now */}
+      {!user && (
+        <div className="bg-blue-50 border border-blue-200 rounded-md p-3 flex gap-3 items-start">
+          <Info className="text-blue-500 mt-0.5 shrink-0" size={18} />
+          <div className="text-sm text-blue-700">
+            <p>
+              <strong>Password</strong> akan diatur secara acak (Login via
+              IMAP/Email).
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ACTION BUTTONS */}
+      <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-6">
         <button type="button" className="btn-secondary" onClick={onCancel}>
           Batal
         </button>
         <button type="submit" className="btn-primary" disabled={isSaving}>
-          {isSaving ? 'Menyimpan...' : 'Simpan Pengguna'}
+          {isSaving
+            ? 'Menyimpan...'
+            : user
+            ? 'Simpan Perubahan'
+            : 'Tambah Pengguna'}
         </button>
       </div>
     </form>
   );
 }
 
-// This is the main page component
+// Main Page Component
 function UserManagementPage() {
   const queryClient = useQueryClient();
   const [modalState, setModalState] = useState({ isOpen: false, user: null });
@@ -154,6 +174,7 @@ function UserManagementPage() {
 
   const saveUserMutation = useMutation({
     mutationFn: (userData) => {
+      // Determine if Create or Update based on modal state
       return modalState.user?.id
         ? apiClient.put(`/users/${modalState.user.id}`, userData)
         : apiClient.post('/users', userData);
@@ -198,7 +219,7 @@ function UserManagementPage() {
               Manajemen Pengguna
             </h1>
             <p className="text-gray-500 mt-1">
-              Tambah, edit, atau hapus akun pengguna sistem.
+              Kelola akses dan peran pengguna aplikasi.
             </p>
           </div>
           <button
@@ -227,16 +248,16 @@ function UserManagementPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Nama
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Email
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Peran
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Satuan Kerja
                     </th>
                     <th className="relative px-6 py-3">
@@ -246,7 +267,10 @@ function UserManagementPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {users.map((user) => (
-                    <tr key={user.id}>
+                    <tr
+                      key={user.id}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {user.name}
                       </td>
@@ -254,23 +278,25 @@ function UserManagementPage() {
                         {user.email}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {user.role.replace('_', ' ').toUpperCase()}
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {user.role.replace('_', ' ').toUpperCase()}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {user.satker?.nama || 'BPS Provinsi Gorontalo'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-4">
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
                         <button
                           onClick={() => openModal(user)}
-                          className="inline-flex items-center gap-1.5 text-bpsBlue-dark hover:text-bpsBlue-light font-semibold"
+                          className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-900"
                         >
-                          <Edit size={14} /> <span>Edit</span>
+                          <Edit size={16} /> Edit
                         </button>
                         <button
                           onClick={() => handleDelete(user)}
-                          className="inline-flex items-center gap-1.5 text-danger hover:text-danger-dark font-semibold"
+                          className="inline-flex items-center gap-1 text-red-600 hover:text-red-900"
                         >
-                          <Trash2 size={14} /> <span>Hapus</span>
+                          <Trash2 size={16} /> Hapus
                         </button>
                       </td>
                     </tr>

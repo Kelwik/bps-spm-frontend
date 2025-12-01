@@ -1,6 +1,6 @@
 // src/pages/SpmPage.jsx
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import apiClient from '../api';
@@ -9,7 +9,15 @@ import { useSatker } from '../contexts/SatkerContext';
 import StatusBadge from '../components/StatusBadge';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
-import { Plus, Edit, Trash2, Link as LinkIcon } from 'lucide-react';
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Link as LinkIcon,
+  Download,
+  FileSpreadsheet,
+  AlertCircle,
+} from 'lucide-react';
 
 const formatDate = (dateString) =>
   new Date(dateString).toLocaleDateString('id-ID', {
@@ -17,6 +25,7 @@ const formatDate = (dateString) =>
     month: 'long',
     year: 'numeric',
   });
+
 const formatCurrency = (number) =>
   new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -28,12 +37,21 @@ function SpmPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { selectedSatkerId, tahunAnggaran, isContextSet } = useSatker();
+
+  // State for Delete Confirmation
   const [spmToDelete, setSpmToDelete] = useState(null);
+
+  // State for Error Handling (Replaces alert)
+  const [errorMessage, setErrorMessage] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+
+  // State for Import
+  const fileInputRef = useRef(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // --- 1. CHECK IF USER IS VIEWER ---
   const isViewer = user?.role === 'viewer';
 
   const { data, isLoading, isError, error } = useQuery({
@@ -64,9 +82,10 @@ function SpmPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['spms'] });
       setSpmToDelete(null);
+      setSuccessMessage('SPM berhasil dihapus.');
     },
     onError: (error) => {
-      alert(
+      setErrorMessage(
         `Gagal menghapus SPM: ${error.response?.data?.error || error.message}`
       );
       setSpmToDelete(null);
@@ -80,6 +99,61 @@ function SpmPage() {
     }
   };
 
+  // --- HANDLER: Download Template ---
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await apiClient.get('/spm/template', {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'Template_Import_SPM.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      setErrorMessage('Gagal mendownload template. Silakan coba lagi.');
+      console.error(err);
+    }
+  };
+
+  // --- HANDLER: Upload Excel ---
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!selectedSatkerId && user.role !== 'op_satker') {
+      setErrorMessage('Harap pilih Satker terlebih dahulu di Dashboard.');
+      e.target.value = null;
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    if (selectedSatkerId) formData.append('satkerId', selectedSatkerId);
+
+    setIsImporting(true);
+    try {
+      const res = await apiClient.post('/spm/import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setSuccessMessage(
+        res.data.message || 'Import berhasil! Data telah ditambahkan.'
+      );
+      queryClient.invalidateQueries({ queryKey: ['spms'] });
+      queryClient.invalidateQueries({ queryKey: ['spmsDashboardStats'] });
+    } catch (err) {
+      console.error(err);
+      setErrorMessage(
+        `Import gagal: ${err.response?.data?.error || err.message}`
+      );
+    } finally {
+      setIsImporting(false);
+      e.target.value = null;
+    }
+  };
+
   const isProvAndNoSatkerSelected =
     (user?.role === 'op_prov' || user?.role === 'supervisor') &&
     !selectedSatkerId;
@@ -87,7 +161,7 @@ function SpmPage() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Daftar SPM</h1>
             <p className="text-gray-500 mt-1">
@@ -95,32 +169,70 @@ function SpmPage() {
             </p>
           </div>
 
-          {/* --- 2. HIDE CREATE BUTTON FOR VIEWERS --- */}
           {!isViewer && (
-            <div
-              className="relative w-full md:w-auto"
-              title={
-                isProvAndNoSatkerSelected
-                  ? 'Silakan pilih Satker spesifik di Dashboard untuk membuat SPM baru'
-                  : ''
-              }
-            >
-              <Link
-                to="/spm/baru"
-                className={`btn-primary w-full ${
-                  isProvAndNoSatkerSelected || !isContextSet
-                    ? 'opacity-50 cursor-not-allowed'
-                    : ''
-                }`}
-                onClick={(e) => {
-                  if (isProvAndNoSatkerSelected || !isContextSet)
-                    e.preventDefault();
-                }}
-                aria-disabled={isProvAndNoSatkerSelected || !isContextSet}
+            <div className="flex flex-wrap gap-2 w-full xl:w-auto">
+              {/* 1. Tombol Download Template */}
+              <button
+                onClick={handleDownloadTemplate}
+                className="btn-secondary flex items-center gap-2"
+                title="Download format Excel untuk import"
               >
-                <Plus size={18} />
-                <span>Buat SPM Baru</span>
-              </Link>
+                <Download size={18} />
+                <span className="hidden sm:inline">Template</span>
+              </button>
+
+              {/* 2. Tombol Import Excel */}
+              <div className="relative">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept=".xlsx, .xls"
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current.click()}
+                  disabled={
+                    isImporting || isProvAndNoSatkerSelected || !isContextSet
+                  }
+                  className={`btn-success flex items-center gap-2 ${
+                    isProvAndNoSatkerSelected || !isContextSet
+                      ? 'opacity-50 cursor-not-allowed'
+                      : ''
+                  }`}
+                  title={isProvAndNoSatkerSelected ? 'Pilih Satker dulu' : ''}
+                >
+                  <FileSpreadsheet size={18} />
+                  <span>{isImporting ? 'Mengupload...' : 'Import Excel'}</span>
+                </button>
+              </div>
+
+              {/* 3. Tombol Buat SPM Manual */}
+              <div
+                className="relative"
+                title={
+                  isProvAndNoSatkerSelected
+                    ? 'Silakan pilih Satker spesifik di Dashboard untuk membuat SPM baru'
+                    : ''
+                }
+              >
+                <Link
+                  to="/spm/baru"
+                  className={`btn-primary flex items-center gap-2 ${
+                    isProvAndNoSatkerSelected || !isContextSet
+                      ? 'opacity-50 cursor-not-allowed'
+                      : ''
+                  }`}
+                  onClick={(e) => {
+                    if (isProvAndNoSatkerSelected || !isContextSet)
+                      e.preventDefault();
+                  }}
+                  aria-disabled={isProvAndNoSatkerSelected || !isContextSet}
+                >
+                  <Plus size={18} />
+                  <span>Buat Baru</span>
+                </Link>
+              </div>
             </div>
           )}
         </div>
@@ -217,7 +329,6 @@ function SpmPage() {
                             <StatusBadge status={spm.status} />
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-4">
-                            {/* Link text changed to 'Lihat' for viewers */}
                             <Link
                               to={`/spm/${spm.id}/edit`}
                               className="inline-flex items-center gap-1.5 text-bpsBlue-dark hover:text-bpsBlue-light font-semibold"
@@ -226,7 +337,6 @@ function SpmPage() {
                               <span>{isViewer ? 'Lihat' : 'Detail'}</span>
                             </Link>
 
-                            {/* --- 3. HIDE DELETE BUTTON FOR VIEWERS --- */}
                             {!isViewer &&
                               ['MENUNGGU', 'DITOLAK'].includes(spm.status) && (
                                 <button
@@ -255,6 +365,7 @@ function SpmPage() {
         </div>
       </div>
 
+      {/* --- MODAL: DELETE CONFIRMATION --- */}
       <Modal
         isOpen={!!spmToDelete}
         onClose={() => setSpmToDelete(null)}
@@ -286,6 +397,50 @@ function SpmPage() {
           <br />
           Tindakan ini tidak dapat dibatalkan.
         </p>
+      </Modal>
+
+      {/* --- MODAL: ERROR MESSAGE --- */}
+      <Modal
+        isOpen={!!errorMessage}
+        onClose={() => setErrorMessage(null)}
+        title={
+          <span className="flex items-center gap-2 text-red-600">
+            <AlertCircle size={20} />
+            Terjadi Kesalahan
+          </span>
+        }
+        footer={
+          <button
+            onClick={() => setErrorMessage(null)}
+            className="btn-secondary"
+          >
+            Tutup
+          </button>
+        }
+      >
+        <p className="text-sm text-gray-600">{errorMessage}</p>
+      </Modal>
+
+      {/* --- MODAL: SUCCESS MESSAGE --- */}
+      <Modal
+        isOpen={!!successMessage}
+        onClose={() => setSuccessMessage(null)}
+        title={
+          <span className="flex items-center gap-2 text-green-600">
+            <AlertCircle size={20} />
+            Berhasil
+          </span>
+        }
+        footer={
+          <button
+            onClick={() => setSuccessMessage(null)}
+            className="btn-primary"
+          >
+            OK
+          </button>
+        }
+      >
+        <p className="text-sm text-gray-600">{successMessage}</p>
       </Modal>
     </>
   );
