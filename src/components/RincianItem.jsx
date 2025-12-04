@@ -1,3 +1,5 @@
+// src/components/RincianItem.jsx
+
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api';
 import { Trash2 } from 'lucide-react';
@@ -14,8 +16,25 @@ function RincianItem({ itemData, kodeAkunId, onUpdate, onRemove, isOnlyItem }) {
   });
 
   const handleInputChange = (field, value) => onUpdate({ [field]: value });
-  const handleJumlahChange = (value) =>
-    onUpdate({ jumlah: parseInt(value) || 0 });
+
+  // --- NEW: Helper to format number with dots (Indonesian style) ---
+  const formatNumber = (num) => {
+    if (num === null || num === undefined || isNaN(num)) return '';
+    if (num === 0) return ''; // Optional: Return '' if you want empty field for 0
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  };
+
+  // --- NEW: Handle changes for the formatted input ---
+  const handleJumlahChange = (inputValue) => {
+    // 1. Remove non-digit characters (dots, commas, letters)
+    const cleanValue = inputValue.replace(/\./g, '').replace(/[^0-9]/g, '');
+
+    // 2. Convert to integer
+    const numberValue = parseInt(cleanValue, 10);
+
+    // 3. Update parent state with the RAW NUMBER (or 0 if NaN)
+    onUpdate({ jumlah: isNaN(numberValue) ? 0 : numberValue });
+  };
 
   const handleFlagChange = (flagName, flagType) => {
     const existingFlags = itemData.jawabanFlags || [];
@@ -52,11 +71,13 @@ function RincianItem({ itemData, kodeAkunId, onUpdate, onRemove, isOnlyItem }) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div>
           <label className="form-label-sm">Jumlah (Rp)</label>
+          {/* UPDATED INPUT */}
           <input
-            type="number"
-            value={itemData.jumlah}
+            type="text"
+            value={formatNumber(itemData.jumlah)}
             onChange={(e) => handleJumlahChange(e.target.value)}
-            className="form-input"
+            className="form-input font-mono text-right" // Added font-mono for better alignment
+            placeholder="0"
             required
           />
         </div>
