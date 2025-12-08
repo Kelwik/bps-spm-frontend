@@ -40,7 +40,7 @@ function SpmCreatePage({ isEditMode = false }) {
   const { user } = useAuth();
   const { selectedSatkerId, tahunAnggaran: selectedYear } = useSatker();
 
-  // --- 1. CHECK IF USER IS VIEWER ---
+  // --- CHECK IF USER IS VIEWER ---
   const isViewer = user?.role === 'viewer';
 
   const [spmData, setSpmData] = useState({
@@ -109,15 +109,19 @@ function SpmCreatePage({ isEditMode = false }) {
     }
   }, [isEditMode, existingSpmData]);
 
+  // --- REVISI: REMOVED DEFAULT NAVIGATION ---
   const { mutate: saveSpm, isPending: isSaving } = useMutation({
     mutationFn: (payload) =>
       isEditMode
         ? apiClient.put(`/spm/${spmId}`, payload)
         : apiClient.post('/spm', payload),
     onSuccess: () => {
+      // Invalidate queries so data is fresh
       queryClient.invalidateQueries({ queryKey: ['spms'] });
       queryClient.invalidateQueries({ queryKey: ['allRincian'] });
-      navigate('/spm');
+
+      // FIX: Do NOT navigate here.
+      // We navigate manually in the specific handlers (handleSubmit / handleStatusUpdate)
     },
     onError: (err) =>
       setError(
@@ -142,12 +146,61 @@ function SpmCreatePage({ isEditMode = false }) {
       setError(err.response?.data?.error || 'Gagal memperbarui status SPM.'),
   });
 
+  // Fungsi mengumpulkan payload
+  const getPayload = () => {
+    const targetSatkerId =
+      user.role === 'op_satker' ? user.satkerId : selectedSatkerId;
+
+    const rincianForApi = rincianGroups.flatMap((group) =>
+      group.items.map((item) => ({
+        id: isEditMode && item.spmId ? item.id : undefined,
+        kodeProgram: group.kodeProgram,
+        kodeKegiatan: group.kodeKegiatan,
+        kodeAkunId: group.kodeAkunId,
+        jumlah: item.jumlah,
+        jawabanFlags: item.jawabanFlags,
+        kodeKRO: item.kodeKRO,
+        kodeRO: item.kodeRO,
+        kodeKomponen: item.kodeKomponen,
+        kodeSubkomponen: item.kodeSubkomponen,
+        uraian: item.uraian,
+        catatan: item.catatan || null,
+      }))
+    );
+
+    return {
+      ...spmData,
+      tahunAnggaran: parseInt(spmData.tahunAnggaran),
+      satkerId: isEditMode ? existingSpmData.satkerId : targetSatkerId,
+      rincian: rincianForApi,
+    };
+  };
+
+  // Handler tombol Terima/Tolak yang dimodifikasi
   const handleStatusUpdate = (newStatus) => {
-    if (newStatus === 'DITOLAK') {
-      setIsCommentModalOpen(true);
-    } else if (newStatus === 'DITERIMA') {
-      setIsAcceptModalOpen(true);
-    }
+    // 1. Simpan data terbaru (termasuk catatan) terlebih dahulu
+    const payload = getPayload();
+
+    // Gunakan 'mutate' dengan onSuccess custom
+    saveSpm(payload, {
+      onSuccess: () => {
+        // 2. Jika simpan sukses, query sudah di-invalidate di default onSuccess.
+        // Sekarang kita buka modal TANPA redirect.
+        queryClient.invalidateQueries({ queryKey: ['spm', spmId] });
+
+        if (newStatus === 'DITOLAK') {
+          setIsCommentModalOpen(true);
+        } else if (newStatus === 'DITERIMA') {
+          setIsAcceptModalOpen(true);
+        }
+      },
+      onError: (err) => {
+        setError(
+          'Gagal menyimpan perubahan sebelum memvalidasi: ' +
+            (err.response?.data?.error || err.message)
+        );
+      },
+    });
   };
 
   const handleRejectSubmit = (comment) => {
@@ -176,6 +229,7 @@ function SpmCreatePage({ isEditMode = false }) {
             kodeKomponen: '',
             kodeSubkomponen: '',
             uraian: '',
+            catatan: '',
           },
         ],
       },
@@ -200,41 +254,27 @@ function SpmCreatePage({ isEditMode = false }) {
       );
       return;
     }
-    // ... rincianForApi logic ...
-    const rincianForApi = rincianGroups.flatMap((group) =>
-      group.items.map((item) => ({
-        id: isEditMode && item.spmId ? item.id : undefined,
-        kodeProgram: group.kodeProgram,
-        kodeKegiatan: group.kodeKegiatan,
-        kodeAkunId: group.kodeAkunId,
-        jumlah: item.jumlah,
-        jawabanFlags: item.jawabanFlags,
-        kodeKRO: item.kodeKRO,
-        kodeRO: item.kodeRO,
-        kodeKomponen: item.kodeKomponen,
-        kodeSubkomponen: item.kodeSubkomponen,
-        uraian: item.uraian,
-      }))
-    );
-    const finalPayload = {
-      ...spmData,
-      tahunAnggaran: parseInt(spmData.tahunAnggaran),
-      satkerId: isEditMode ? existingSpmData.satkerId : targetSatkerId,
-      rincian: rincianForApi,
-    };
-    saveSpm(finalPayload);
+
+    const payload = getPayload();
+
+    // --- REVISI: Explicit Navigation on Manual Save ---
+    saveSpm(payload, {
+      onSuccess: () => {
+        navigate('/spm'); // Navigate only when clicking "Simpan" button
+      },
+    });
   };
 
-  // --- 2. DISABLE FORM IF USER IS VIEWER ---
-  // If user is viewer, the form is ALWAYS disabled.
   const isFormDisabled =
-    isViewer || (isEditMode && existingSpmData?.status === 'DITERIMA');
+    isViewer ||
+    (isEditMode &&
+      existingSpmData?.status === 'DITERIMA' &&
+      user?.role !== 'supervisor');
 
-  // --- 3. HIDE BUTTONS FOR VIEWERS ---
   const showValidationButtons =
-    !isViewer && // Hide if viewer
+    !isViewer &&
     isEditMode &&
-    ['op_prov', 'supervisor'].includes(user.role) &&
+    user.role === 'supervisor' &&
     existingSpmData?.status === 'MENUNGGU';
 
   const showSaveButtons = !isFormDisabled && !isViewer;
@@ -282,7 +322,6 @@ function SpmCreatePage({ isEditMode = false }) {
             </div>
           )}
 
-        {/* Show message for Viewers */}
         {isViewer && (
           <div className="bg-blue-50 p-4 mb-6 rounded-md border border-blue-200 text-blue-800">
             Anda sedang dalam <strong>Mode Lihat (Read-Only)</strong>. Anda
@@ -299,7 +338,6 @@ function SpmCreatePage({ isEditMode = false }) {
 
         <form onSubmit={handleSubmit} className="space-y-8">
           <fieldset disabled={isFormDisabled}>
-            {/* ... (Informasi Utama fields remain the same) ... */}
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-gray-700 border-b pb-2">
                 Informasi Utama
@@ -362,7 +400,6 @@ function SpmCreatePage({ isEditMode = false }) {
               </div>
             </div>
 
-            {/* ... (Daftar Rincian section) ... */}
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-gray-700 border-b pb-2">
                 Daftar Rincian
@@ -390,30 +427,28 @@ function SpmCreatePage({ isEditMode = false }) {
             </div>
           </fieldset>
 
-          {/* Form Actions / Buttons */}
           <div className="pt-6 border-t flex flex-wrap justify-end gap-4">
             {showValidationButtons && (
               <>
                 <button
                   type="button"
                   onClick={() => handleStatusUpdate('DITOLAK')}
-                  disabled={updateStatusMutation.isPending}
+                  disabled={isSaving || updateStatusMutation.isPending}
                   className="btn-danger"
                 >
-                  Tolak & Kembalikan
+                  {isSaving ? 'Menyimpan...' : 'Tolak & Kembalikan'}
                 </button>
                 <button
                   type="button"
                   onClick={() => handleStatusUpdate('DITERIMA')}
-                  disabled={updateStatusMutation.isPending}
+                  disabled={isSaving || updateStatusMutation.isPending}
                   className="btn-success"
                 >
-                  Terima & Finalisasi
+                  {isSaving ? 'Menyimpan...' : 'Terima & Finalisasi'}
                 </button>
               </>
             )}
 
-            {/* Always show "Kembali" button, but hide "Simpan" for viewers */}
             <button
               type="button"
               onClick={() => navigate('/spm')}
@@ -442,7 +477,6 @@ function SpmCreatePage({ isEditMode = false }) {
         </form>
       </div>
 
-      {/* Modals (only needed if buttons are shown, but safe to keep) */}
       <CommentModal
         isOpen={isCommentModalOpen}
         onClose={() => setIsCommentModalOpen(false)}

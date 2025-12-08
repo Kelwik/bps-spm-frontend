@@ -100,6 +100,7 @@ function UserForm({ user, onSuccess, onCancel, isSaving }) {
           className="form-input"
         >
           <option value="op_prov">Operator Provinsi</option>
+          <option value="supervisor">Supervisor</option>
           <option value="op_satker">Operator Satker</option>
           <option value="viewer">Viewer</option>
         </select>
