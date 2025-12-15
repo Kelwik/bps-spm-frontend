@@ -411,7 +411,12 @@ function SpmPage() {
                       />
                       <HeaderCell label="Tanggal" field="tanggal" width="15%" />
                       {user?.role !== 'op_satker' && (
-                        <HeaderCell label="Satker" field="satker" width="18%" />
+                        <HeaderCell
+                          label="Satker"
+                          field="satker"
+                          width="18%"
+                          sortable={false}
+                        />
                       )}
                       <HeaderCell
                         label="Total Anggaran"
