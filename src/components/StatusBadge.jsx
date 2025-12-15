@@ -7,7 +7,7 @@ function StatusBadge({ status }) {
 
   const statusText = {
     MENUNGGU: 'Menunggu',
-    DITOLAK: 'Ditolak',
+    DITOLAK: 'Dikembalikan',
     DITERIMA: 'Diterima',
   };
 

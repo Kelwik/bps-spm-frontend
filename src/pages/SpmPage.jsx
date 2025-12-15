@@ -440,7 +440,10 @@ function SpmPage() {
           </button>
         }
       >
-        <p className="text-sm text-gray-600">{successMessage}</p>
+        {/* Added whitespace-pre-wrap to handle newlines in message */}
+        <p className="text-sm text-gray-600 whitespace-pre-wrap">
+          {successMessage}
+        </p>
       </Modal>
     </>
   );
