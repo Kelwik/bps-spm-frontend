@@ -109,19 +109,14 @@ function SpmCreatePage({ isEditMode = false }) {
     }
   }, [isEditMode, existingSpmData]);
 
-  // --- REVISI: REMOVED DEFAULT NAVIGATION ---
   const { mutate: saveSpm, isPending: isSaving } = useMutation({
     mutationFn: (payload) =>
       isEditMode
         ? apiClient.put(`/spm/${spmId}`, payload)
         : apiClient.post('/spm', payload),
     onSuccess: () => {
-      // Invalidate queries so data is fresh
       queryClient.invalidateQueries({ queryKey: ['spms'] });
       queryClient.invalidateQueries({ queryKey: ['allRincian'] });
-
-      // FIX: Do NOT navigate here.
-      // We navigate manually in the specific handlers (handleSubmit / handleStatusUpdate)
     },
     onError: (err) =>
       setError(
@@ -146,7 +141,6 @@ function SpmCreatePage({ isEditMode = false }) {
       setError(err.response?.data?.error || 'Gagal memperbarui status SPM.'),
   });
 
-  // Fungsi mengumpulkan payload
   const getPayload = () => {
     const targetSatkerId =
       user.role === 'op_satker' ? user.satkerId : selectedSatkerId;
@@ -176,18 +170,11 @@ function SpmCreatePage({ isEditMode = false }) {
     };
   };
 
-  // Handler tombol Terima/Tolak yang dimodifikasi
   const handleStatusUpdate = (newStatus) => {
-    // 1. Simpan data terbaru (termasuk catatan) terlebih dahulu
     const payload = getPayload();
-
-    // Gunakan 'mutate' dengan onSuccess custom
     saveSpm(payload, {
       onSuccess: () => {
-        // 2. Jika simpan sukses, query sudah di-invalidate di default onSuccess.
-        // Sekarang kita buka modal TANPA redirect.
         queryClient.invalidateQueries({ queryKey: ['spm', spmId] });
-
         if (newStatus === 'DITOLAK') {
           setIsCommentModalOpen(true);
         } else if (newStatus === 'DITERIMA') {
@@ -254,22 +241,18 @@ function SpmCreatePage({ isEditMode = false }) {
       );
       return;
     }
-
     const payload = getPayload();
-
-    // --- REVISI: Explicit Navigation on Manual Save ---
     saveSpm(payload, {
       onSuccess: () => {
-        navigate('/spm'); // Navigate only when clicking "Simpan" button
+        navigate('/spm');
       },
     });
   };
 
+  // --- FIX: DISABLED LOGIC UPDATED ---
+  // Now explicitly disables form if status is DITERIMA, regardless of role.
   const isFormDisabled =
-    isViewer ||
-    (isEditMode &&
-      existingSpmData?.status === 'DITERIMA' &&
-      user?.role !== 'supervisor');
+    isViewer || (isEditMode && existingSpmData?.status === 'DITERIMA');
 
   const showValidationButtons =
     !isViewer &&
@@ -329,11 +312,17 @@ function SpmCreatePage({ isEditMode = false }) {
           </div>
         )}
 
+        {/* --- UI FEEDBACK FOR LOCKED SPM --- */}
         {isFormDisabled && !isViewer && (
-          <div className="bg-blue-100 p-4 mb-6 rounded-md">
-            SPM ini sudah <strong>Diterima</strong> dan tidak dapat diubah lagi.
+          <div className="bg-blue-100 p-4 mb-6 rounded-md border border-blue-200 text-blue-900 flex items-center gap-2">
+            <CheckCircle size={20} className="text-blue-700" />
+            <span>
+              SPM ini sudah <strong>Diterima (Final)</strong> dan terkunci.
+              Tidak dapat diubah kembali.
+            </span>
           </div>
         )}
+
         {error && <div className="bg-red-100 p-4 mb-6 rounded-md">{error}</div>}
 
         <form onSubmit={handleSubmit} className="space-y-8">
