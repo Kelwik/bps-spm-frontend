@@ -65,7 +65,7 @@ function LoginPage() {
               <input
                 type=""
                 className="w-full h-12 border border-gray-300 rounded-lg p-2 pl-10 focus:outline-none focus:ring-2 focus:ring-bpsBlue"
-                placeholder="Masukkan E-mail Anda"
+                placeholder="Masukkan Username SSO Anda"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
