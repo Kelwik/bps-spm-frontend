@@ -49,6 +49,13 @@ function ContextControls({ isContextSet, setIsContextSet }) {
     setTahunAnggaran,
   } = useSatker();
 
+  // --- NEW: DYNAMIC YEAR LOGIC ---
+  const currentYear = new Date().getFullYear();
+  // Generate [2026, 2025, 2024, 2023, 2022]
+  const yearsList = Array.from({ length: 5 }, (_, i) =>
+    (currentYear - i).toString()
+  );
+
   // Local state for draft selections before applying
   const [draftTahun, setDraftTahun] = useState(tahunAnggaran);
   const [draftSatker, setDraftSatker] = useState(selectedSatkerId || '');
@@ -76,8 +83,6 @@ function ContextControls({ isContextSet, setIsContextSet }) {
       setIsContextSet(false);
     } else {
       // If context is not set, apply the draft selections
-      // Only set satkerId if user is NOT restricted (admins can choose)
-      // Restricted users (op_satker/viewer) already have it set in Context
       if (!isSatkerUser) {
         setSelectedSatkerId(draftSatker ? parseInt(draftSatker) : null);
       }
@@ -118,7 +123,8 @@ function ContextControls({ isContextSet, setIsContextSet }) {
             ))}
           </select>
         </div>
-        {/* Tahun Anggaran Selection Dropdown */}
+
+        {/* Tahun Anggaran Selection Dropdown (DYNAMIC) */}
         <div className="w-full">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Tahun Anggaran
@@ -129,11 +135,14 @@ function ContextControls({ isContextSet, setIsContextSet }) {
             onChange={(e) => setDraftTahun(e.target.value)}
             disabled={isContextSet} // Disable if context is set
           >
-            <option value="2025">2025</option>
-            <option value="2024">2024</option>
-            <option value="2023">2023</option>
+            {yearsList.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
           </select>
         </div>
+
         {/* Apply/Change Context Button */}
         <div className="w-full">
           <button
